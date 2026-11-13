@@ -80,7 +80,9 @@ export function buildState(events, now) {
   });
 
   const active = (c) => !DONE.has(c.status);
-  cases.sort((a, b) => (active(b) - active(a)) || (b.status === 'new') - (a.status === 'new') || b.score - a.score || a.firstAt - b.firstAt);
+  // Order: open before closed; unassigned before taken; anyone still waiting before families who say they are safe; then points.
+  const safe = (c) => c.flags.includes('says-safe');
+  cases.sort((a, b) => (active(b) - active(a)) || (b.status === 'new') - (a.status === 'new') || safe(a) - safe(b) || b.score - a.score || a.firstAt - b.firstAt);
 
   const open = cases.filter(active);
   return {
@@ -115,5 +117,7 @@ export function followUpText(c, lang = 'both') {
 
 /** Reply for people who keep re-sharing a request that is already done. */
 export function alreadyRescuedText(c, at) {
-  return `UPDATE: The family at ${c.address || c.areaName} (${c.areaName}) was marked RESCUED by volunteers${at ? ` at ${at}` : ''}. Please stop sharing this request so boats go to people still waiting. 🙏`;
+  const place = [c.address, c.areaName].filter(Boolean).join(', ');
+  return `தகவல்: ${place} குடும்பம்${at ? ` ${at} மணிக்கு` : ''} மீட்கப்பட்டனர். இந்தக் கோரிக்கையை இனி பகிர வேண்டாம், படகுகள் காத்திருப்பவர்களுக்குச் செல்லட்டும். நன்றி.\n\n`
+    + `Update: the family at ${place} was rescued${at ? ` at ${at}` : ''}. Please stop forwarding this request so the boats go to people who are still waiting. Thank you.`;
 }

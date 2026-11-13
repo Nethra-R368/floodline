@@ -6,35 +6,29 @@ import { extractWithGemini } from './gemini.js';
 import { $, esc } from './util.js';
 
 const METRICS = [
-  { key: 'neverReached', label: 'Households never reached', lower: true, fmt: (v) => v },
-  { key: 'criticalOver3h', label: 'Critical cases (pregnant, medical, baby, neck-deep) waiting 3h+ or never reached', lower: true, fmt: (v) => v },
-  { key: 'duplicateTrips', label: 'Boat trips wasted on a family already rescued', lower: true, fmt: (v) => v },
-  { key: 'wastedSelfRescued', label: 'Boat trips to families who had already got out', lower: true, fmt: (v) => v },
-  { key: 'medianWaitCritical', label: 'Median wait, critical cases', lower: true, fmt: (v) => (v == null ? '—' : fmtMinutes(v)) },
-  { key: 'medianWait', label: 'Median wait, everyone reached', lower: true, fmt: (v) => (v == null ? '—' : fmtMinutes(v)) },
-  { key: 'lostMessages', label: 'Messages that scrolled away unread', lower: true, fmt: (v) => v },
+  { key: 'neverReached', label: 'Households no boat ever reached' },
+  { key: 'criticalOver3h', label: 'Critical households (pregnant, medical, baby, neck-deep water) that waited over 3 hours or were never reached' },
+  { key: 'duplicateTrips', label: 'Boat trips to a family that had already been rescued' },
+  { key: 'wastedSelfRescued', label: 'Boat trips to a family that had already got out on their own' },
+  { key: 'medianWaitCritical', label: 'Typical (median) wait for critical households that were reached', time: true },
+  { key: 'medianWait', label: 'Typical (median) wait for everyone who was reached', time: true },
+  { key: 'lostMessages', label: 'Messages that scrolled away before anyone read them' },
 ];
 
-function delta(m, f, lower, isTime) {
-  if (m == null || f == null) return '<div class="delta same">—</div>';
-  if (m === f) return '<div class="delta same">same</div>';
-  const better = lower ? f < m : f > m;
-  const diff = Math.abs(f - m);
-  return `<div class="delta ${better ? 'better' : 'worse'}">${better ? '▼' : '▲'} ${isTime ? fmtMinutes(diff) : diff} ${better ? 'better' : 'worse'} with FloodLine</div>`;
-}
+const show = (v, time) => (v == null ? '—' : time ? fmtMinutes(v) : String(v));
 
-function headline(m, f) {
-  const parts = [];
-  if (m.neverReached > f.neverReached) parts.push(`reached <b>${m.neverReached - f.neverReached} more households</b>`);
-  if (m.duplicateTrips > f.duplicateTrips) parts.push(`wasted <b>${f.duplicateTrips}</b> boat trips on repeats instead of <b>${m.duplicateTrips}</b>`);
-  if (m.criticalOver3h > f.criticalOver3h) parts.push(`left <b>${f.criticalOver3h}</b> critical cases waiting 3h+ instead of <b>${m.criticalOver3h}</b>`);
-  return parts.length ? `With the same boats, FloodLine ${parts.join(', ')}.` : 'On this night FloodLine did not beat manual coordination on the headline numbers.';
+function verdict(m, f, time) {
+  if (m == null || f == null || m === f) return '<span class="muted">same</span>';
+  const d = Math.abs(f - m);
+  return f < m ? `<span class="better">${show(d, time)} fewer${time ? '' : ''}</span>`.replace(' fewer', time ? ' shorter' : ' fewer')
+    : `<span class="worse">${show(d, time)} ${time ? 'longer' : 'more'}</span>`;
 }
 
 export function initBench({ getAi }) {
   const form = $('benchForm');
   const out = $('benchResults');
   let ran = false;
+  let aiHard = null;
 
   function params() {
     const fd = new FormData(form);
@@ -46,31 +40,34 @@ export function initBench({ getAi }) {
     };
   }
 
+  const assumptions = (p) => `<details class="assume"><summary>What the simulation assumes</summary><ul>
+    <li><b>Today's way:</b> ${p.sim.volunteers} volunteers read the group chat from top to bottom. Each message takes ${p.sim.minutesPerMessage} minutes (read it, call back, post it in the boat group). A message left unread for ${DEFAULT_SIM.scrollAwayMin} minutes is treated as lost in the scroll. When a family is posted again, a volunteer recognises the repeat ${Math.round(p.sim.manualRepeatCatch * 100)}% of the time. An obviously critical message is moved to the front half the time.</li>
+    <li><b>With FloodLine:</b> messages are pasted in within ${DEFAULT_SIM.floodlineDelayMin} minutes. FloodLine's own rule reader and repeat-matching code run on every message (no AI in this test). A free boat takes the highest-priority request nobody has taken.</li>
+    <li><b>Boats:</b> a round trip is 20 minutes plus 10 minutes per km from the nearest of four depots. A boat that arrives after the family was rescued, or got out on their own, has made a wasted trip.</li>
+    <li><b>Reading the medians:</b> they only include households that were reached. Today's way never reaches many households, and those are missing from its median, so read it next to "never reached".</li>
+    <li>FloodLine serves critical households first, so lower-risk households can wait longer. That is a choice, and it shows in the numbers.</li>
+    <li>This is a simulation with made-up households and messages. It shows what better coordination does under these assumptions. It is not a result from a real flood.</li>
+  </ul></details>`;
+
   function runOne() {
     const p = params();
     const night = generateNight({ seed: p.seed, households: p.households });
     const m = simulate(night, 'manual', p.sim);
     const f = simulate(night, 'floodline', p.sim);
-    const cards = METRICS.map((x) => `<div class="metric"><div class="label">${x.label}</div><div class="pair"><div class="m"><small>Manual</small><b>${x.fmt(m[x.key])}</b></div><div class="f"><small>FloodLine</small><b>${x.fmt(f[x.key])}</b></div></div>${delta(m[x.key], f[x.key], x.lower, x.key.startsWith('median'))}</div>`).join('');
-    out.innerHTML = `<p class="headline">${headline(m, f)}</p>
-      <p class="small muted">Night ${p.seed}: ${night.households.length} households, ${night.messages.length} messages (${night.messages.filter((x) => x.truth.kind === 'request').length} requests incl. reposts), ${f.criticalTotal} critical, ${p.sim.boats} boats, 12 hours.</p>
-      <div class="results">${cards}</div>
-      <details class="panel assumptions"><summary><b>Model assumptions (change them above)</b></summary>
-        <ul>
-          <li>Manual: ${p.sim.volunteers} volunteers read the chat in order; each message takes ${p.sim.minutesPerMessage} min (read, call back, post in boat group). Unread messages older than ${DEFAULT_SIM.scrollAwayMin} min are lost in the scroll. A repost of a household already sent a boat is recognised ${Math.round(p.sim.manualRepeatCatch * 100)}% of the time. Obviously critical messages jump the queue half the time.</li>
-          <li>FloodLine: every message reaches it within ${DEFAULT_SIM.floodlineDelayMin} min (forwarded/pasted in batches). It runs the real rule extractor and duplicate matcher (no AI in this benchmark), and a free boat takes the highest-priority unassigned case.</li>
-          <li>Boat round trip = 20 min + 10 min per km from the nearest of 4 depots. A boat arriving after the family was rescued or got out by themselves is a wasted trip.</li>
-          <li>Median waits only count households that were reached. Manual coordination leaves many households unreached, and those never enter its median, so compare medians together with "never reached".</li>
-          <li>FloodLine's median wait for <i>everyone</i> can be longer: it deliberately serves critical cases first, so low-risk households wait more. That trade-off is shown, not hidden.</li>
-          <li>The night is simulated (fictional names and numbers). It shows the coordination effect, not a field result.</li>
-        </ul></details>`;
+    const reqs = night.messages.filter((x) => x.truth.kind === 'request').length;
+    out.innerHTML = `
+      <p class="result-line">On this night, with the same ${p.sim.boats} boats, FloodLine reached <b>${m.neverReached - f.neverReached}</b> more households and made <b>${m.duplicateTrips - f.duplicateTrips}</b> fewer trips to families who were already rescued.</p>
+      <p class="result-meta">Night ${p.seed}: ${night.households.length} households, ${night.messages.length} messages (${reqs} of them requests, many repeated), ${f.criticalTotal} critical households, 12 hours.</p>
+      <table class="cmp"><thead><tr><th>Measure</th><th>Today's way</th><th>With FloodLine</th><th>Difference</th></tr></thead><tbody>
+      ${METRICS.map((x) => `<tr><td>${x.label}</td><td class="n">${show(m[x.key], x.time)}</td><td class="n">${show(f[x.key], x.time)}</td><td class="n">${verdict(m[x.key], f[x.key], x.time)}</td></tr>`).join('')}
+      </tbody></table>${assumptions(p)}`;
     renderAccuracy(night);
     ran = true;
   }
 
   async function runMany() {
     const p = params();
-    out.innerHTML = '<p class="headline">Running 20 different nights…</p>';
+    out.innerHTML = '<p class="result-line">Running 20 different nights…</p>';
     const rows = [];
     for (let s = 1; s <= 20; s++) {
       const night = generateNight({ seed: s * 101, households: p.households });
@@ -81,29 +78,29 @@ export function initBench({ getAi }) {
       const xs = rows.map((r) => r[side][key]).filter((v) => v != null);
       return xs.length ? Math.round((xs.reduce((a, b) => a + b, 0) / xs.length) * 10) / 10 : null;
     };
-    const wins = (key) => rows.filter((r) => r.floodline[key] < r.manual[key]).length;
-    const losses = (key) => rows.filter((r) => r.floodline[key] > r.manual[key]).length;
-    out.innerHTML = `<p class="headline">Average over 20 simulated nights (${p.households} households each, ${p.sim.boats} boats)</p>
-      <table class="acc-table"><thead><tr><th>Metric</th><th>Manual</th><th>FloodLine</th><th>FloodLine better / worse</th></tr></thead><tbody>
-      ${METRICS.map((x) => `<tr><td>${x.label}</td><td class="num">${x.key.startsWith('median') ? fmtMinutes(avg('manual', x.key)) : avg('manual', x.key)}</td><td class="num">${x.key.startsWith('median') ? fmtMinutes(avg('floodline', x.key)) : avg('floodline', x.key)}</td><td class="num">better ${wins(x.key)}, worse ${losses(x.key)} of 20</td></tr>`).join('')}
-      </tbody></table>`;
+    const count = (key, cmp) => rows.filter((r) => cmp(r.floodline[key], r.manual[key])).length;
+    out.innerHTML = `<p class="result-line">Averages over 20 different simulated nights (${p.households} households each, ${p.sim.boats} boats).</p>
+      <table class="cmp"><thead><tr><th>Measure</th><th>Today's way</th><th>With FloodLine</th><th>Nights FloodLine did better / worse</th></tr></thead><tbody>
+      ${METRICS.map((x) => `<tr><td>${x.label}</td><td class="n">${show(avg('manual', x.key), x.time)}</td><td class="n">${show(avg('floodline', x.key), x.time)}</td><td class="n"><span class="better">${count(x.key, (a, b) => a < b)}</span> / <span class="worse">${count(x.key, (a, b) => a > b)}</span></td></tr>`).join('')}
+      </tbody></table>${assumptions(p)}`;
   }
 
-  let aiHard = null;
   function renderAccuracy(night) {
     const gen = evaluateExtraction(night);
     const dd = evaluateDedupe(night);
     const rules = scoreHardSet(extractRules);
-    const fields = ['kind', 'area', 'phones', 'people', 'vulnerable', 'water'];
+    const fields = [['kind', 'Type of message (request, update, offer, other)'], ['area', 'Area'], ['phones', 'Phone numbers'], ['people', 'Number of people'], ['vulnerable', 'Who is vulnerable'], ['water', 'Water level']];
     const genMap = { kind: gen.kind, area: gen.area, phones: gen.phone, people: gen.people, vulnerable: gen.vulnerable, water: gen.water };
     const cell = (v) => (v == null ? '—' : `${v}%`);
-    $('accuracy').innerHTML = `<table class="acc-table"><thead><tr><th>Field</th><th>Generated night · rules</th><th>Hard set · rules</th><th>Hard set · Gemini + guardrails</th></tr></thead><tbody>
-      ${fields.map((k) => `<tr><td>${k}</td><td class="num">${cell(genMap[k])}</td><td class="num">${cell(rules.fields[k])}</td><td class="num">${aiHard ? cell(aiHard.fields[k]) : '<span class="muted">run below</span>'}</td></tr>`).join('')}
-      <tr><td><b>overall</b></td><td></td><td class="num"><b>${rules.overall}%</b> <span class="muted small">(${rules.checks} checks)</span></td><td class="num">${aiHard ? `<b>${aiHard.overall}%</b>` : ''}</td></tr>
+    $('accuracy').innerHTML = `<table class="cmp"><thead><tr><th>Field</th><th>Generated night, rules</th><th>Hard set, rules</th><th>Hard set, Gemini + checks</th></tr></thead><tbody>
+      ${fields.map(([k, label]) => `<tr><td>${label}</td><td class="n">${cell(genMap[k])}</td><td class="n">${cell(rules.fields[k])}</td><td class="n">${aiHard ? cell(aiHard.fields[k]) : '<span class="muted">not run</span>'}</td></tr>`).join('')}
+      <tr><td><b>All fields</b></td><td class="n"></td><td class="n"><b>${rules.overall}%</b></td><td class="n">${aiHard ? `<b>${aiHard.overall}%</b>` : ''}</td></tr>
       </tbody></table>
-      <p class="small muted">Duplicate matching on the generated night: precision ${dd.precision}%, recall ${dd.recall}% (${dd.reports} reports → ${dd.clusters} cases for ${dd.households} real households).</p>`;
-    const list = (aiHard || rules).misses.slice(0, 12);
-    $('misses').innerHTML = `<h4 class="small muted">What ${aiHard ? 'Gemini' : 'the rules'} still get wrong on the hard set (${(aiHard || rules).misses.length} misses)</h4>${list.map((m) => `<div class="miss"><b>${m.field}</b>: wanted ${esc(JSON.stringify(m.want))}, got ${esc(JSON.stringify(m.got))} · <span class="muted">${esc(m.text.slice(0, 110))}</span></div>`).join('')}`;
+      <p class="note">Grouping repeats on the generated night: ${dd.reports} request messages became ${dd.clusters} households; there were really ${dd.households}. (Precision ${dd.precision}%, recall ${dd.recall}%.)</p>`;
+    const src = aiHard || rules;
+    $('misses').innerHTML = `<h2>What ${aiHard ? 'Gemini' : 'the rules'} still get wrong on the hard set</h2>
+      <p class="note">${src.misses.length} mistakes out of ${src.checks} checks.</p>
+      ${src.misses.slice(0, 14).map((m) => `<div class="miss"><b>${m.field}</b>: should be ${esc(JSON.stringify(m.want))}, got ${esc(JSON.stringify(m.got))}<br><span class="muted">${esc(m.text.slice(0, 130))}</span></div>`).join('')}`;
   }
 
   form.addEventListener('submit', (e) => { e.preventDefault(); runOne(); });
@@ -111,13 +108,13 @@ export function initBench({ getAi }) {
   $('aiHardBtn').addEventListener('click', async () => {
     const ai = getAi();
     const status = $('aiHardStatus');
-    if (!ai.key) { status.textContent = 'Add a Gemini key in ⚙️ settings first.'; return; }
-    status.textContent = 'Asking Gemini…';
+    if (!ai.key) { status.textContent = 'Add a Gemini key in Settings first.'; return; }
+    status.textContent = 'Sending the 30 messages to Gemini…';
     try {
-      const xs = await extractWithGemini(HARD_SET.map((h) => h.text), ai.key, ai.model, 10, (d, n) => { status.textContent = `Gemini read ${d}/${n}…`; });
+      const xs = await extractWithGemini(HARD_SET.map((h) => h.text), ai.key, ai.model, 10, (d, n) => { status.textContent = `Gemini has read ${d} of ${n}…`; });
       aiHard = scoreHardSet((t, i) => xs[i]);
       const blocked = xs.reduce((s, x) => s + (x.guard || []).filter((g) => /Blocked|Ignored/.test(g)).length, 0);
-      status.textContent = `Done. Guardrails blocked ${blocked} detail${blocked === 1 ? '' : 's'} that were not in the messages.`;
+      status.textContent = `Done. ${blocked} detail${blocked === 1 ? '' : 's'} Gemini gave were not in the messages, so they were not used.`;
       renderAccuracy(generateNight({ seed: params().seed, households: params().households }));
     } catch (err) {
       status.textContent = err.message;

@@ -4,7 +4,7 @@ import { hashJitter } from './util.js';
 const COLORS = () => {
   const cs = getComputedStyle(document.documentElement);
   const v = (n) => cs.getPropertyValue(n).trim();
-  return { critical: v('--critical'), high: v('--high'), medium: v('--medium'), low: v('--low'), done: v('--done') };
+  return { critical: v('--red'), high: v('--amber'), medium: v('--blue'), low: v('--grey'), done: v('--green') };
 };
 
 export function createMap(el, onOpen) {

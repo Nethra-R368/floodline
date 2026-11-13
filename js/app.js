@@ -85,7 +85,7 @@ function renderPresence() {
   const now = Date.now();
   for (const [k, p] of peers) if (now - p.at > 10000) peers.delete(k);
   const n = peers.size + 1;
-  els.presence.textContent = `● ${n} volunteer${n === 1 ? '' : 's'} online`;
+  els.presence.textContent = `${n} volunteer${n === 1 ? '' : 's'} here`;
   els.presence.title = ['You', ...[...peers.values()].map((p) => p.name || 'Unnamed volunteer')].join(', ');
 }
 setInterval(() => { send({ type: 'hello', name: me.name }); renderPresence(); }, 4000);
@@ -101,13 +101,13 @@ function addEvents(evs) {
 // ---------------- replay of the simulated night ----------------
 function setPlaying(on) {
   if (on && !timer) {
-    if (W.clock >= NIGHT_END) { toast('The night is over. Press Reset to replay.'); return; }
+    if (W.clock >= NIGHT_END) { toast('The practice night is over. Press Reset to run it again.'); return; }
     timer = setInterval(tick, 250);
   } else if (!on && timer) {
     clearInterval(timer);
     timer = null;
   }
-  els.play.textContent = timer ? '⏸ Pause' : W.clock >= NIGHT_END ? '✓ Night over' : W.clock > 0 ? '▶ Resume' : '▶ Play the night';
+  els.play.textContent = timer ? 'Pause' : W.clock >= NIGHT_END ? 'Night finished' : W.clock > 0 ? 'Resume' : 'Start the night';
 }
 
 function tick() {
@@ -122,7 +122,7 @@ function tick() {
   if (els.autoBoats.checked) runBoats();
   send({ type: 'clock', clock: W.clock, cursor: W.cursor });
   saveWorkspace();
-  if (W.clock >= NIGHT_END) { setPlaying(false); toast('Night over: open the Proof tab to compare with manual coordination.'); }
+  if (W.clock >= NIGHT_END) { setPlaying(false); toast('The practice night is over. The Results page compares it with manual coordination.'); }
   scheduleRender();
 }
 
@@ -184,16 +184,16 @@ async function addPasted() {
   const kinds = evs.reduce((m, e) => ({ ...m, [e.x.kind]: (m[e.x.kind] || 0) + 1 }), {});
   els.inboxStatus.textContent = `Added ${evs.length} message${evs.length > 1 ? 's' : ''}: ${Object.entries(kinds).map(([k, n]) => `${n} ${k}`).join(', ')}.`;
   if (ai.use && ai.key) {
-    els.inboxStatus.textContent += ' Gemini is double-checking…';
+    els.inboxStatus.textContent += ' Gemini is re-reading them…';
     try {
       const xs = await extractWithGemini(evs.map((e) => e.text), ai.key, ai.model);
       const later = nowMin();
       addEvents(xs.map((x, i) => ({ t: 'extract', id: eventId('x'), at: later, reportId: evs[i].id, x })));
       const blocked = xs.reduce((s, x) => s + (x.guard ? x.guard.filter((g) => /Blocked|Ignored/.test(g)).length : 0), 0);
       const changed = xs.filter((x, i) => JSON.stringify([x.kind, x.areaId, x.people, x.water, x.vulnerable]) !== JSON.stringify([evs[i].x.kind, evs[i].x.areaId, evs[i].x.people, evs[i].x.water, evs[i].x.vulnerable])).length;
-      els.inboxStatus.textContent = `Added ${evs.length}. Gemini checked them: improved ${changed}, guardrails blocked ${blocked} detail${blocked === 1 ? '' : 's'} not found in the text.`;
+      els.inboxStatus.textContent = `Added ${evs.length}. Gemini re-read them and corrected ${changed}.${blocked ? ` ${blocked} detail${blocked === 1 ? '' : 's'} it gave ${blocked === 1 ? 'was' : 'were'} not in the messages, so ${blocked === 1 ? 'it was' : 'they were'} not used.` : ''}`;
     } catch (err) {
-      els.inboxStatus.textContent = `Added ${evs.length} with rules. AI check skipped: ${err.message}`;
+      els.inboxStatus.textContent = `Added ${evs.length}, read by rules only. Gemini didn't respond: ${err.message}`;
     }
   }
 }
@@ -203,7 +203,7 @@ els.sampleBtn.addEventListener('click', () => {
   const pick = [4, 5, 0, 16, 22, 6, 7, 12];
   els.paste.value = pick.map((i) => HARD_SET[i].text).join('\n\n');
   els.paste.focus();
-  els.inboxStatus.textContent = 'Real-world style messages loaded. Press "Add to board".';
+  els.inboxStatus.textContent = 'Example messages loaded (made up, written like real ones). Press “Add to board”.';
 });
 
 // ---------------- rendering ----------------
@@ -216,11 +216,13 @@ function scheduleRender() {
   if (document.hidden) setTimeout(run, 50); else requestAnimationFrame(run);
 }
 
-const VULN_LABEL = { pregnant: '🤰 pregnant', medical: '🩺 medical', infant: '👶 baby', elderly: '👵 elderly', disabled: '♿ cannot walk' };
-const WATER_LABEL = { knee: 'knee water', waist: 'waist water', neck: 'neck-deep', roof: 'on terrace' };
-const STATUS_LABEL = { new: 'Unassigned', claimed: 'Claimed', enroute: 'On the way', rescued: 'Rescued', unreachable: 'Not reached' };
-const FLAG_LABEL = { stale: '⚠ NO ONE ON IT', check: 'CHECK IN', reshared: 'RE-SHARED AFTER RESCUE', 'says-safe': 'SAYS SAFE NOW' };
+const VULN = { pregnant: 'pregnant', medical: 'needs medical care', infant: 'baby', elderly: 'elderly', disabled: 'cannot walk' };
+const WATER = { knee: 'water at knee', waist: 'water at waist', neck: 'water at neck', roof: 'on the terrace' };
+const STATUS = { new: 'Unassigned', claimed: 'Taken', enroute: 'Boat on the way', rescued: 'Rescued', unreachable: 'Could not reach' };
+const STATUS_TA = { new: 'யாரும் எடுக்கவில்லை', claimed: 'எடுக்கப்பட்டது', enroute: 'படகு வருகிறது', rescued: 'மீட்கப்பட்டனர்', unreachable: 'அடைய முடியவில்லை' };
+const PRIO = { critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low' };
 const isDone = (c) => c.status === 'rescued' || c.status === 'unreachable';
+const fmtPhone = (p) => `${p.slice(0, 5)} ${p.slice(5)}`;
 
 function matchesFilter(c) {
   if (filter === 'action' && !(c.status === 'new' || c.flags.includes('check') || c.flags.includes('says-safe'))) return false;
@@ -233,24 +235,42 @@ function matchesFilter(c) {
   return true;
 }
 
-function caseTitle(c) {
-  return `${c.people ? `${c.people} ${c.people === 1 ? 'person' : 'people'}` : 'Household'} · ${esc(c.areaName)}`;
+function who(c) {
+  const n = c.people ? `${c.people} ${c.people === 1 ? 'person' : 'people'}` : 'Household';
+  return `${n}, ${c.areaId ? esc(c.areaName) : 'area not recognised'}`;
+}
+
+function factsLine(c) {
+  const bits = [
+    ...c.vulnerable.map((v) => `<span class="v">${VULN[v]}</span>`),
+    c.water ? WATER[c.water] : '',
+    ...c.needs.filter((n) => n !== 'rescue').map((n) => `needs ${n}`),
+    c.reportIds.length > 1 ? `reported ${c.reportIds.length} times` : '',
+  ].filter(Boolean);
+  return bits.join(' · ');
+}
+
+function warnings(c) {
+  const out = [];
+  if (c.flags.includes('stale')) out.push('<span class="warnline stale">No one has taken this</span>');
+  if (c.flags.includes('check')) out.push('<span class="warnline check">No update for 90 min</span>');
+  if (c.flags.includes('says-safe')) out.push('<span class="warnline safe">Family says they are safe</span>');
+  if (c.flags.includes('reshared')) out.push('<span class="warnline reshared">Still being shared</span>');
+  return out.join('');
 }
 
 function caseHtml(c, rank) {
-  const chips = [
-    ...c.vulnerable.map((v) => `<span class="chip v">${VULN_LABEL[v]}</span>`),
-    c.water ? `<span class="chip w">${WATER_LABEL[c.water]}</span>` : '',
-    c.reportIds.length > 1 ? `<span class="chip rep">reported ${c.reportIds.length}×</span>` : '',
-    ...c.needs.filter((n) => n !== 'rescue').map((n) => `<span class="chip">${n}</span>`),
-  ].join('');
-  const flags = c.flags.map((f) => `<span class="flag ${f}">${FLAG_LABEL[f]}</span>`).join('');
-  const wait = c.status === 'new' ? `waiting ${fmtMinutes(c.waiting)}` : c.owner ? esc(c.owner) : '';
-  const fresh = !firstRender && !seenCases.has(c.id) ? ' new-flash' : '';
-  return `<li><button type="button" class="case t-${c.tier} s-${c.status}${fresh}" data-id="${esc(c.id)}">
-    <span class="rank">${isDone(c) ? '✓' : `#${rank}`}<span class="score" style="color:var(--${isDone(c) ? 'done' : c.tier})">${c.score}</span></span>
-    <span><h3>${caseTitle(c)}</h3><div class="addr">${esc(c.address || 'No street given')}${c.phones[0] ? ` · ${esc(c.phones[0])}` : ''}</div><div class="chips">${chips}</div></span>
-    <span class="side"><span class="badge ${c.status}">${STATUS_LABEL[c.status]}</span><span class="wait">${wait}</span>${flags}</span>
+  const done = isDone(c);
+  const since = c.status === 'new' ? `${fmtMinutes(c.waiting)} waiting` : c.owner ? esc(c.owner) : '';
+  const fresh = !firstRender && !seenCases.has(c.id) ? ' fresh' : '';
+  return `<li><button type="button" class="case p-${c.tier}${done ? ' closed' : ''}${fresh}" data-id="${esc(c.id)}">
+    <span class="prio">${done ? 'Closed' : PRIO[c.tier]}<span class="mono">${done ? '' : `#${rank}`}</span><span class="mono">${done ? '' : `${c.score} pts`}</span></span>
+    <span class="body">
+      <span class="who">${who(c)}</span>
+      <span class="where" style="display:block">${esc(c.address || 'no street given')}${c.phones[0] ? ` · ${fmtPhone(c.phones[0])}` : ''}</span>
+      <span class="facts" style="display:block">${factsLine(c) || '<span class="muted">no details given</span>'}</span>
+    </span>
+    <span class="state"><span class="st ${c.status === 'new' ? 'new' : done ? 'closed' : ''}">${STATUS[c.status]}</span><span class="mono">${since}</span>${warnings(c)}</span>
   </button></li>`;
 }
 
@@ -259,15 +279,12 @@ function render() {
   state = buildState(W.events, now);
   const s = state.stats;
   els.clock.textContent = fmtClock(now);
-  els.clockLabel.textContent = ws === 'demo' ? `Simulated night · ${Math.round((W.clock / NIGHT_END) * 100)}%` : 'Live';
-  els.stats.innerHTML = [
-    ['Unassigned', s.unassigned, s.unassigned ? 'alert' : ''],
-    ['Critical open', s.critical, s.critical ? 'alert' : ''],
-    ['No one on it 45m+', s.stale, s.stale ? 'alert' : ''],
-    ['Rescued', s.rescued, 'good'],
-    ['Repeats merged', s.merged, ''],
-    ['Messages', s.messages, ''],
-  ].map(([label, v, cls]) => `<div class="stat ${cls}"><b>${v}</b><span>${label}</span></div>`).join('');
+  els.clockLabel.textContent = ws === 'demo' ? `practice night, ${Math.round((W.clock / NIGHT_END) * 100)}% through` : 'live';
+  const part = (n, label, alert) => `<span class="${alert && n ? 'alert' : ''}"><b>${n}</b> ${label}</span>`;
+  els.stats.innerHTML = s.messages
+    ? [part(s.unassigned, 'unassigned', true), part(s.critical, 'critical still open', true), part(s.stale, 'with no one on them for 45+ min', true), part(s.rescued, 'rescued'),
+      part(s.merged, 'repeat messages merged'), part(s.messages, 'messages read')].join('<span class="sep">/</span>')
+    : '<span class="muted">No messages yet.</span>';
 
   const active = state.cases.filter((c) => !isDone(c));
   const rankOf = new Map(active.map((c, i) => [c.id, i + 1]));
@@ -278,15 +295,17 @@ function render() {
   $('fAssigned').textContent = state.cases.filter((c) => c.status === 'claimed' || c.status === 'enroute').length;
   $('fDone').textContent = state.cases.filter(isDone).length;
 
-  els.offerCount.textContent = state.offers.length;
-  els.offers.innerHTML = state.offers.slice(-8).reverse().map((o) => `<li>${esc(o.text)}</li>`).join('') || '<li class="muted">Boat and food offers show up here.</li>';
+  els.offerCount.textContent = state.offers.length || '';
+  els.offers.innerHTML = state.offers.slice(-8).reverse().map((o) => `<li>${esc(o.text)}</li>`).join('') || '<li class="muted">Boats, vehicles and food offered by people show up here.</li>';
   els.feed.innerHTML = [...state.reports].sort((a, b) => b.at - a.at).slice(0, 12)
-    .map((r) => `<li><span class="kind k-${r.x.kind}">${r.x.kind}</span><span class="muted small">${fmtClock(r.at)}</span> ${esc(r.text.length > 140 ? `${r.text.slice(0, 140)}…` : r.text)}</li>`).join('') || '<li class="muted">Nothing yet.</li>';
+    .map((r) => `<li><span class="k ${r.x.kind}">${fmtClock(r.at)} ${r.x.kind}</span>${esc(r.text.length > 150 ? `${r.text.slice(0, 150)}…` : r.text)}</li>`).join('') || '<li class="muted">Nothing yet.</li>';
 
   mapApi.update(state.cases);
   state.cases.forEach((c) => seenCases.add(c.id));
   firstRender = false;
-  els.aiState.textContent = ai.key && ai.use ? '🤖 Gemini + rules' : 'rules only (offline)';
+  els.aiState.textContent = ai.key && ai.use
+    ? 'Messages are read by rules first, then checked by Gemini.'
+    : 'Messages are read by rules, offline. Add a Gemini key in Settings to catch landmarks and loose wording.';
   if (openCaseId) renderDrawer();
 }
 
@@ -301,7 +320,7 @@ document.querySelectorAll('.filter').forEach((b) => b.addEventListener('click', 
 }));
 els.search.addEventListener('input', () => { query = els.search.value.trim().toLowerCase(); render(); });
 
-// ---------------- case drawer ----------------
+// ---------------- request drawer ----------------
 function findCase(id) {
   return state.cases.find((c) => c.id === id) || state.cases.find((c) => c.reportIds.includes(id));
 }
@@ -326,45 +345,53 @@ function renderDrawer() {
   const c = findCase(openCaseId);
   if (!c) { closeDrawer(); return; }
   openCaseId = c.id;
-  const maxPts = 40;
-  const why = c.reasons.map((r) => `<div class="why-row ${r.points < 0 ? 'neg' : ''}"><div>${esc(r.label)}<div class="bar"><i style="width:${Math.min(100, (Math.abs(r.points) / maxPts) * 100)}%"></i></div></div><b>${r.points > 0 ? '+' : ''}${r.points}</b></div>`).join('');
-  const actBtn = (status, label, cls = 'secondary') => `<button type="button" class="${cls}" data-act="${status}">${label}</button>`;
+  const done = isDone(c);
+  const actBtn = (status, label, cls = 'btn') => `<button type="button" class="${cls}" data-act="${status}">${label}</button>`;
   const actions = [];
-  if (c.status === 'new') actions.push(actBtn('claim', '✋ I’ll take this', 'primary'));
-  if (c.status === 'new' || c.status === 'claimed') actions.push(actBtn('enroute', '🛶 Boat on the way'));
-  if (!isDone(c)) actions.push(actBtn('rescued', '✓ Rescued', 'rescued'), actBtn('unreachable', 'Couldn’t reach'));
-  else actions.push(actBtn('open', '↺ Reopen'));
-  const phones = c.phones.map((p) => `<a class="secondary file-btn" href="tel:+91${p}">📞 ${p.slice(0, 5)} ${p.slice(5)}</a><a class="secondary file-btn" href="https://wa.me/91${p}?text=${encodeURIComponent(followUpText(c, 'both'))}" target="_blank" rel="noopener">WhatsApp</a>`).join('');
-  const follow = followUpText(c);
-  const merges = c.merges.length ? `<div class="merge-note">🔗 ${c.reportIds.length} reports merged into this case: ${[...new Set(c.merges.map((m) => m.why))].join(', ')}.</div>` : '';
-  const reports = c.reports.map((r) => `<div class="msg"><div class="meta"><span>${fmtClock(r.at)}</span><span>${esc(r.source || '')}</span><span>${r.x.lang}</span><span class="src ${r.x.source === 'ai' ? 'ai' : ''}">${r.x.source === 'ai' ? '🤖 AI-checked' : 'rules'}</span></div>${esc(r.text)}${(r.x.guard || []).filter((g) => /Blocked|Ignored/.test(g)).map((g) => `<div class="guard">🛡 ${esc(g)}</div>`).join('')}</div>`).join('');
-  const safe = c.safeReports.length && !isDone(c) ? `<section><h4>Family says they are safe</h4>${c.safeReports.map((u) => `<div class="msg">${esc(u.text)}</div>`).join('')}<button type="button" class="rescued" data-act="rescued">✓ Confirm safe, close case</button></section>` : '';
-  const reshared = c.reshared ? `<section><h4>Still being shared after rescue (${c.reshared}×)</h4><div class="copybox" id="rescuedText">${esc(alreadyRescuedText(c, fmtClock(c.resolvedAt)))}</div><div class="row"><button type="button" class="secondary" data-copy="rescuedText">Copy reply for the group</button></div></section>` : '';
-  const history = c.history.map((h) => `<li><b>${fmtClock(h.at)}</b> ${esc(h.by || '')} ${h.t === 'claim' ? 'took the case' : `→ ${STATUS_LABEL[h.status] || h.status}`}${h.note ? ` · ${esc(h.note)}` : ''}</li>`).join('');
+  if (c.status === 'new') actions.push(actBtn('claim', 'I’ll take this <span class="ta">நான் எடுத்துக்கொள்கிறேன்</span>', 'btn dark'));
+  if (c.status === 'new' || c.status === 'claimed') actions.push(actBtn('enroute', 'Boat is on the way'));
+  if (!done) actions.push(actBtn('rescued', 'Mark rescued', 'btn go'), actBtn('unreachable', 'Could not reach'));
+  else actions.push(actBtn('open', 'Reopen'));
+  const phones = c.phones.map((p) => `<a class="btn" href="tel:+91${p}">Call <span class="mono">${fmtPhone(p)}</span></a><a class="btn" href="https://wa.me/91${p}?text=${encodeURIComponent(followUpText(c, 'both'))}" target="_blank" rel="noopener">WhatsApp</a>`).join('');
+  const total = c.reasons.reduce((s, r) => s + r.points, 0);
+  const points = c.reasons.map((r) => `<tr><td>${esc(r.label)}</td><td>${r.points > 0 ? '+' : ''}${r.points}</td></tr>`).join('')
+    + `<tr class="total"><td>Priority: ${PRIO[c.tier].toLowerCase()}</td><td>${total}</td></tr>`;
+  const reports = c.reports.map((r) => `<div class="msg"><div class="meta">${fmtClock(r.at)} · ${esc(r.source || '')} · read by ${r.x.source === 'ai' ? 'Gemini (checked)' : 'rules'}</div>${esc(r.text)}${(r.x.guard || []).filter((g) => /Blocked|Ignored/.test(g)).map((g) => `<div class="blocked">Not used: ${esc(g.replace(/^(Blocked|Ignored)\s*/, ''))}</div>`).join('')}</div>`).join('');
+  const mergeWhy = [...new Set(c.merges.map((m) => m.why))];
+  const history = c.history.map((h) => `<li><span class="mono">${fmtClock(h.at)}</span>${esc(h.by || '')} ${h.t === 'claim' ? 'took this request' : `marked it “${STATUS[h.status] || 'reopened'}”`}${h.note ? ` — ${esc(h.note)}` : ''}</li>`).join('');
 
   els.drawer.innerHTML = `
-    <button type="button" class="ghost close" aria-label="Close">✕</button>
-    <span class="badge ${c.status}">${STATUS_LABEL[c.status]}</span> <span class="badge" style="color:var(--${c.tier})">${c.tier} · ${c.score} pts</span>
-    ${c.flags.map((f) => `<span class="flag ${f}">${FLAG_LABEL[f]}</span>`).join(' ')}
-    <h2>${caseTitle(c)}</h2>
-    <div class="muted">${esc(c.address || 'No street given')}</div>
-    <div class="small muted">First reported ${fmtClock(c.firstAt)} · ${c.status === 'new' ? `waiting ${fmtMinutes(c.waiting)} with no one assigned` : c.owner ? `with ${esc(c.owner)}` : ''}</div>
-    <section><h4>What to do</h4><div class="actions">${actions.join('')}</div><div class="actions" style="margin-top:8px">${phones || '<span class="small muted">No phone number in any report. Ask the people who shared it.</span>'}</div></section>
-    ${safe}
-    <section><h4>Why it is ranked here</h4><div class="why">${why || '<span class="small muted">No urgency signals found.</span>'}</div></section>
-    <section><h4>Details</h4><dl class="facts">
-      <dt>Area</dt><dd>${esc(c.areaName)}</dd>
+    <button type="button" class="textbtn close">Close</button>
+    <div class="kicker" style="color:var(--${done ? 'green' : { critical: 'red', high: 'amber', medium: 'blue', low: 'grey' }[c.tier]})">${done ? 'Closed' : `${PRIO[c.tier]} priority`} · ${STATUS[c.status]} <span class="ta">${STATUS_TA[c.status]}</span></div>
+    <h2>${who(c)}</h2>
+    <div class="addr">${esc(c.address || 'no street given')}</div>
+    <div class="sub">First reported at ${fmtClock(c.firstAt)}${c.status === 'new' ? `, waiting ${fmtMinutes(c.waiting)} with no one assigned` : c.owner ? `, with ${esc(c.owner)}` : ''}.</div>
+    ${c.flags.includes('stale') ? '<div class="alertbox">No one has taken this request for over 45 minutes.</div>' : ''}
+    ${c.flags.includes('says-safe') ? `<div class="okbox">A later message says this family is safe: “${esc(c.safeReports[0].text.slice(0, 160))}” Call to confirm, then mark it rescued.</div>` : ''}
+
+    <section><h3>Actions</h3><div class="row">${actions.join('')}</div>
+      <div class="row">${phones || '<span class="note">No phone number in any of the messages. Ask the people who shared it.</span>'}</div></section>
+
+    <section><h3>Why it is in this position</h3><table class="points">${points}</table>
+      <p class="note muted">Points add up from the details in the messages. You can always take a lower one first if you know better.</p></section>
+
+    <section><h3>Details</h3><dl class="kv">
+      <dt>Area</dt><dd>${c.areaId ? esc(c.areaName) : 'not recognised'}</dd>
       <dt>Address</dt><dd>${esc(c.address || '—')}</dd>
       <dt>People</dt><dd>${c.people ?? 'not stated'}</dd>
-      <dt>Vulnerable</dt><dd>${c.vulnerable.map((v) => VULN_LABEL[v]).join(', ') || 'none mentioned'}</dd>
-      <dt>Water</dt><dd>${c.water ? WATER_LABEL[c.water] : 'not stated'}</dd>
+      <dt>Vulnerable</dt><dd>${c.vulnerable.map((v) => VULN[v]).join(', ') || 'none mentioned'}</dd>
+      <dt>Water</dt><dd>${c.water ? WATER[c.water] : 'not stated'}</dd>
       <dt>Needs</dt><dd>${c.needs.join(', ') || '—'}</dd>
-      <dt>Contact</dt><dd>${esc(c.name || '')} ${c.phones.join(', ') || '—'}</dd>
+      <dt>Contact</dt><dd>${esc(c.name || '')} <span class="mono">${c.phones.map(fmtPhone).join(', ') || '—'}</span></dd>
     </dl></section>
-    <section><h4>Follow-up message (closes the loop)</h4><div class="copybox" id="followText">${esc(follow)}</div><div class="row"><button type="button" class="secondary" data-copy="followText">Copy</button></div></section>
-    ${reshared}
-    <section><h4>Reports (${c.reportIds.length})</h4>${merges}${reports}</section>
-    <section><h4>History</h4><ul class="timeline">${history || '<li class="muted">No actions yet.</li>'}</ul></section>`;
+
+    <section><h3>Message to check if they still need help</h3><div class="copybox" id="followText">${esc(followUpText(c))}</div><div class="row"><button type="button" class="btn" data-copy="followText">Copy</button></div></section>
+    ${c.reshared ? `<section><h3>People are still sharing this after the rescue</h3><div class="copybox" id="rescuedText">${esc(alreadyRescuedText(c, fmtClock(c.resolvedAt)))}</div><div class="row"><button type="button" class="btn" data-copy="rescuedText">Copy reply for the group</button></div></section>` : ''}
+
+    <section><h3>${c.reportIds.length} message${c.reportIds.length > 1 ? 's' : ''} about this household</h3>
+      ${mergeWhy.length ? `<p class="note">Grouped together because they have the ${mergeWhy.map((w) => w.replace(/^same /, 'same ')).join(' or ')}.</p>` : ''}${reports}</section>
+
+    <section><h3>What has happened</h3><ul class="timeline">${history || '<li class="muted">Nothing yet.</li>'}</ul></section>`;
 
   els.drawer.querySelector('.close').addEventListener('click', closeDrawer);
   els.drawer.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', () => act(c, b.dataset.act)));
@@ -380,7 +407,7 @@ async function ensureName() {
 }
 
 async function act(c, what) {
-  if (!(await ensureName())) { toast('Set your volunteer name first'); return; }
+  if (!(await ensureName())) { toast('Add your name first, so others know who has it'); return; }
   const at = nowMin();
   if (what === 'claim') addEvents([{ t: 'claim', id: eventId('c'), at, caseId: c.id, by: me.name }]);
   else {
@@ -389,7 +416,7 @@ async function act(c, what) {
     evs.push({ t: 'status', id: eventId('s'), at, caseId: c.id, status: what, by: me.name });
     addEvents(evs);
   }
-  toast(what === 'claim' ? 'Case is yours. Others can see it.' : `Marked: ${STATUS_LABEL[what] || 'reopened'}`);
+  toast(what === 'claim' ? 'This request is yours now. Other volunteers can see that.' : `Marked “${STATUS[what] || 'reopened'}”`);
 }
 
 // ---------------- settings, name, theme, workspace, export ----------------
@@ -446,7 +473,7 @@ const systemDark = window.matchMedia('(prefers-color-scheme: dark)');
 const isDark = () => (document.documentElement.dataset.theme || (systemDark.matches ? 'dark' : 'light')) === 'dark';
 function applyTheme(t) {
   if (t === 'dark' || t === 'light') document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme;
-  els.themeBtn.textContent = isDark() ? '☀️' : '🌙';
+  els.themeBtn.textContent = isDark() ? 'Light' : 'Dark';
 }
 applyTheme(store.get('floodline.theme'));
 els.themeBtn.addEventListener('click', () => { const t = isDark() ? 'light' : 'dark'; store.set('floodline.theme', t); applyTheme(t); render(); });
@@ -462,11 +489,13 @@ function switchWorkspace(name) {
   firstRender = true;
   els.workspace.value = ws;
   els.replayCtl.classList.toggle('hidden', ws !== 'demo');
+  $('practiceBanner').classList.toggle('hidden', ws !== 'demo');
   openChannel();
   setPlaying(false);
   render();
 }
 els.workspace.addEventListener('change', () => switchWorkspace(els.workspace.value));
+$('goLive').addEventListener('click', () => switchWorkspace('live'));
 setInterval(() => { if (ws === 'live') scheduleRender(); }, 30000);
 
 // tabs

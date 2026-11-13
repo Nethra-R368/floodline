@@ -1,70 +1,75 @@
-# FloodLine: submission text (copy-paste)
+# FloodLine — submission text
 
-For **SLAY HACKS** (AI), **Arbiter Hacks** (General track) and **AI OpenBuild**. Solo project.
+For SLAY HACKS (AI), Arbiter Hacks (General track) and AI OpenBuild. Solo project.
 
-**Built Nov 13, 2026** during the event period. No pre-existing code.
-- Live demo: https://nethra-r368.github.io/floodline/
+Built November 13, 2026, during the event period. No code existed before.
+- Live: https://nethra-r368.github.io/floodline/
 - Code: https://github.com/Nethra-R368/floodline
-- AI used: **Google Gemini** (`gemini-2.5-flash`, JSON mode) for reading messages, behind rule-based guardrails.
+- AI used: Google Gemini (gemini-2.5-flash) to read messages, with every answer checked against the original text.
+
+> Before submitting: replace the two [brackets] below with your own words and the Gemini number from the Results page.
 
 ## Tagline
-When a city floods, rescue requests drown in WhatsApp. FloodLine makes sure nobody gets forgotten.
+A rescue request tracker for volunteer groups during Chennai floods: paste the WhatsApp messages, see who needs help first, and make sure no request is forgotten.
 
 ## Inspiration
-Chennai floods almost every northeast monsoon: 2015, Cyclone Michaung in 2023, Fengal in 2024, Ditwah in 2025. Each time phone lines fail and rescue requests move to WhatsApp, X and Instagram, and volunteers sort them by hand. The same family gets posted ten times, so boats double up while other requests scroll away. Old requests keep being shared after the family is safe. I live here; this happens every year.
+When Chennai floods — 2015, Michaung in 2023, Fengal in 2024, Ditwah in 2025 — phone lines go down and people ask for rescue on WhatsApp, X and Instagram. Volunteer groups read those messages by hand and pass them to boat teams. Reports from 2023 describe volunteers sorting requests from Velachery, Manali and Pallikaranai this way, picking out pregnant women and medical cases by eye.
+
+[Your own reason, in two or three sentences: where you were during one of these floods, or someone you know who was stuck or volunteering, and what you saw go wrong.]
+
+The same problems come up every time: one family posted ten times so two boats go to the same house, old requests forwarded after the family is safe, and requests nobody picked up scrolling away. In the 2018 Kerala floods volunteers built keralarescue.in for this, and the state adopted it. I wanted something like it for the way requests actually arrive in Chennai.
 
 ## What it does
-- **Paste anything**: one message or a whole WhatsApp chat export, in English, Tamil or Tanglish.
-- **Extracts** area, phone, people, water level and who is vulnerable (pregnant, medical, baby, elderly, cannot walk), instantly and offline with rules; **Gemini** then re-reads landmarks and loose phrasing.
-- **AI guardrails**: any AI detail not present in the message (an invented phone number, an unknown area, an address that wasn't written) is blocked and shown.
-- **Merges repeats** into one case with the reason ("same phone number").
-- **Ranks by urgency with reasons** a volunteer can check.
-- **Nobody gets forgotten**: unclaimed 45 min turns red, silent 90 min asks for a check-in, "we are safe" messages and reposts after rescue are flagged with a ready reply.
-- **Live map**, one-tap call and WhatsApp follow-up in Tamil + English, **team sync** via an event log, export/import for handover, phone layout, dark mode.
-- **Proof tab**: replays a flood night with and without FloodLine, with every assumption editable.
+- Volunteers paste messages — one at a time or a whole exported WhatsApp chat — in English, Tamil or Tanglish.
+- It pulls out the area, phone, number of people, water level and who is vulnerable. Rules do this instantly and offline; Gemini re-reads each message to catch landmarks and loose wording.
+- Anything Gemini returns that isn't in the message (a phone number, an area, an address) is not used, and the request shows what was dropped.
+- Messages about the same household are grouped, with the reason shown (same phone number, same door and street).
+- Requests are ordered by urgency using points you can see: pregnant +40, medical +40, neck-deep water +35, and so on.
+- A request nobody takes for 45 minutes is flagged. So is a taken request with no update for 90 minutes, a family whose later message says they are safe, and a request people keep sharing after the rescue — with a ready reply in Tamil and English.
+- Map, call and WhatsApp buttons, a message asking the family if they still need help, shift handover by downloading the board. The emergency numbers 112, 1070, 1077 and 1913 are always at the top, because FloodLine is a coordination tool, not an emergency service.
 
 ## How I built it
-- Plain JavaScript, no framework, GitHub Pages. Leaflet + OpenStreetMap for the map.
-- **Event-sourced state**: every message and action is an immutable event; the board is a pure function of the log, which makes sync, audit and tests simple.
-- **Rule extractor** with a gazetteer of 28 flood-prone Chennai localities in English, Tanglish and Tamil script.
-- **Duplicate matching** with union-find over phone numbers and street/door tokens, with explainable merge reasons.
-- **Gemini** in JSON mode, batched, with retries and model fallback; `guardAi` checks every field against the source text.
-- **Simulation**: a deterministic generator of realistic multilingual SOS traffic with ground truth, and a minute-by-minute boat dispatch simulation comparing manual coordination with FloodLine.
-- 16 unit tests (`node --test`).
+- Plain JavaScript, no framework, hosted on GitHub Pages; Leaflet and OpenStreetMap for the map.
+- Every message and action is stored as an event; the board is calculated from the list of events. That makes syncing between volunteers, the history of each request and testing straightforward.
+- A rule-based reader with a list of 28 flood-prone Chennai localities spelled in English, Tanglish and Tamil script.
+- Repeat grouping by phone number and by door number + street words, with the reason recorded.
+- Gemini in JSON mode, ten messages per call, with retries; a check function compares every field Gemini returns with the original message.
+- A generator of realistic flood-night messages with known answers, and a minute-by-minute boat simulation comparing today's way with FloodLine.
+- 17 unit tests.
 
-## Results (from the Proof tab)
-Average over 20 simulated nights, 110 households each, same 10 boats:
-- Households never reached: **26.8 → 1.1** (better on 20/20 nights)
-- Boat trips wasted on families already rescued: **26.7 → 0.4**
-- Critical cases (pregnant, medical, baby, neck-deep water) waiting 3h+ or never reached: **14.0 → 6.7** (better on 18/20, worse on 2)
-- Honest trade-off: low-risk families wait longer because critical cases go first, and the median wait for critical cases that *were* reached is about the same (1h 01m vs 1h 06m) because manual coordination simply never reaches ~27 households.
+## Results
+I can't test this in a real flood, so I simulated one. The same night is played twice with the same ten boats: once the way groups work today, once with FloodLine, whose real code reads every message. Averages over 20 simulated nights of 110 households:
+- Households no boat ever reached: 26.8 today, 1.2 with FloodLine (better on all 20 nights).
+- Boat trips to a family already rescued: 26.7 → 0.4.
+- Critical households (pregnant, medical, baby, neck-deep water) that waited over 3 hours or were never reached: 14.0 → 6.5 (better on 18 nights, worse on 2).
+- The median wait is a little longer with FloodLine (1h 01m → 1h 06m for critical households that were reached), because today's way never reaches about 27 households and they aren't in its median, and because lower-risk households wait while critical ones go first.
 
-Reading accuracy on 30 hand-written hard messages the rules were never tuned on: rules alone **90.3%** overall but only **37.5%** on people counts; Gemini + guardrails: **[fill in after running "Run Gemini on the hard set" in the Proof tab]**.
+Reading accuracy on 30 hand-written test messages I did not tune the rules on: rules alone get 90.3% of fields right but only 37.5% of head counts; with Gemini and the checks: [Gemini result]%.
 
-## Built during the event vs. before
-Everything was written on Nov 13, 2026. Libraries: Leaflet (map), OpenStreetMap tiles, Google Gemini API. The flood night and all names/numbers in the demo are simulated.
+## What was built during the event
+All of it, on November 13, 2026. Libraries: Leaflet, OpenStreetMap tiles, the Google Gemini API. The practice night and all names and numbers in it are made up.
 
-## One failure case and how I tested
-**Failure case: messages with no locality name.** "Near Phoenix mall backside streets flooded, old couple stuck" has no area name, so the rules put it on the board as **Unknown area** with no map pin (it is still ranked and can be claimed). Gemini resolves the landmark to Velachery, but only because Velachery is in the gazetteer; a landmark in a locality outside the 28 known areas stays unknown. People counts written as words ("old couple", "my amma alone", Tamil "மூன்று பேர்") are also missed by rules (37.5% on the hard set). Next step: a larger gazetteer with landmarks and street-level geocoding.
+## A failure case, and how I tested
+**Failure case:** a message with no area name, like "Near Phoenix mall backside streets flooded, old couple stuck in 1st floor". With rules only, it goes on the board as "area not recognised", with no pin and no head count. It is still listed and can be taken, but it ranks lower than it should. Gemini fixes this one because Velachery is in FloodLine's list of localities; a landmark in a locality outside the list would still not be recognised.
 
-**How I tested**
-- 16 unit tests: phone formats (+91, spaces, no partial numbers), areas in three scripts, Tanglish/Tamil extraction, update/offer/noise detection, duplicate merging and non-merging (different door, different area), priority reasons, claim/rescue/stale/check-in/says-safe/re-shared flags, event-log merging, AI guardrails rejecting invented phones/areas/names, broken AI replies, deterministic simulation, extraction scoring.
-- Measured the extractor on the generated night (100%, an easy upper bound) and on a separate hand-labelled hard set (90.3%), and did not tune the rules on the hard set.
-- The benchmark found a real bug: numbers written "+919876543210" with no space were missed. Fixed and covered by a test.
-- In the browser: played the full night, opened two windows as two volunteers and checked that a claim in one appears instantly in the other, phone layout at 375 px, dark mode, map resizing.
-- Gemini on the hard set with my own key: [result].
+**Testing:**
+- 17 unit tests: phone formats, areas in three scripts, Tamil and Tanglish messages, telling requests from updates, offers and chatter, grouping and not grouping (different door, different area), points, all the warning flags, merging two volunteers' boards, the checks that reject a phone number or area Gemini invented, broken Gemini replies, and that the simulation gives the same result every run.
+- Measured the reader on generated messages (an easy upper bound) and on the separate hand-written set.
+- The simulation found a real bug: numbers written "+919876543210" with no space were missed. Fixed, with a test.
+- In the browser: ran the full practice night; opened two windows as two volunteers and checked that taking a request in one shows in the other immediately; phone size; dark mode.
+- [Gemini on the hand-written set with my key: result.]
 
 ## Challenges
-- Making the AI safe for a rescue setting: guardrails against invented details.
-- Writing realistic Tamil/Tanglish traffic and a hand-labelled hard set to measure honestly.
-- Designing a fair benchmark and showing where FloodLine is worse.
+- Using AI where a wrong detail sends a boat to the wrong house: everything it says is checked against the message.
+- Writing realistic Tamil and Tanglish messages, and a hand-labelled test set, so the accuracy numbers mean something.
+- Making the comparison fair and showing where FloodLine does worse.
 
 ## What's next
-- Cross-device sync backend so volunteers on different phones share one board.
-- SMS intake for areas where only SMS works.
-- Street-level geocoding and a landmark gazetteer.
-- Tamil voice-note transcription.
-- Pilot with a Chennai volunteer group in the monsoon.
+- A small server so volunteers on different phones share one board.
+- Taking requests by SMS for areas without mobile data.
+- More localities and landmarks, and street-level locations.
+- Reading Tamil voice notes.
+- Trying it with a Chennai volunteer group in a monsoon.
 
 ## Built with
 javascript, html, css, gemini, google-ai-studio, leaflet, openstreetmap, github-pages

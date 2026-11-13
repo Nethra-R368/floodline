@@ -1,92 +1,93 @@
-# 🌊 FloodLine — nobody gets forgotten
+# FloodLine
 
-**One shared rescue board for the flood of messy SOS messages a disaster creates.** Paste WhatsApp / X / SMS messages in English, Tamil or Tanglish; FloodLine merges the repeats, ranks the most urgent with reasons, puts them on a map, and tracks every request until a volunteer confirms the rescue.
+A rescue request tracker for volunteer groups during Chennai floods.
 
-**▶ Live demo:** https://nethra-r368.github.io/floodline/ → press **▶ Play the night** (no key, no sign-up)
+Volunteers paste the rescue requests that arrive on WhatsApp, X and SMS. FloodLine reads them (English, Tamil or Tanglish), groups repeats of the same household, puts the most urgent at the top with the reasons written out, and keeps each request on the list until someone marks the family as rescued.
 
-![FloodLine board during a simulated flood night](docs/screenshots/1-board.jpg)
+Live: https://nethra-r368.github.io/floodline/ — it opens on a practice board with a simulated night. Press "Start the night". Every name and phone number on the practice board is made up.
 
-## The problem
+![The request board during a practice night](docs/screenshots/board.jpg)
 
-When Chennai floods (2015, Michaung 2023, Fengal 2024, Ditwah 2025) phone lines fail and rescue requests move to WhatsApp, X and Instagram. Volunteers coordinate by reading them by hand. Three things go wrong every time:
+## Why
 
-1. **Repeats.** One family is posted ten times by relatives, so two boats go to the same house while another request waits.
-2. **No closing the loop.** Nobody knows which requests were handled, so old requests keep circulating after the family is safe.
-3. **Forgotten requests.** A message nobody picked up just scrolls away. Nobody notices the one from six hours ago.
+During the 2015, 2023 (Michaung), 2024 (Fengal) and 2025 (Ditwah) floods, phone lines went down and rescue requests moved to social media. Volunteer groups read them by hand and passed them to boat teams. The same problems came up each time:
 
-## What FloodLine does
+- One family is posted many times by different relatives, so two boats go to the same house.
+- Nobody knows which requests are already handled, so old ones keep being forwarded after the family is safe.
+- A request nobody picked up scrolls out of view.
 
-| | |
-|---|---|
-| 📥 **Reads anything** | Paste one message or a whole WhatsApp chat export. Rules extract area, phone, people, water level and vulnerable people **instantly and offline**. Gemini (optional) then re-reads landmarks ("near Phoenix mall" → Velachery), Tamil number words and loose phrasing. |
-| 🛡 **AI guardrails** | Every AI answer is checked against the original text: a phone number that isn't in the message, an area not in the map, or an address that wasn't written is **blocked**, and the board says so. In a rescue tool an invented detail sends a boat to the wrong house. |
-| 🔗 **Merges repeats** | Same phone, or same street + door number in the same area → one case, with the reason shown ("merged: same phone number"). |
-| 🚨 **Ranks with reasons** | Pregnant/labour +40, medical +40, baby +25, neck-deep water +35, waiting time, number of reports… every point is listed so a volunteer can check the call. |
-| ⏱ **Nobody gets forgotten** | Unclaimed 45 min → red **NO ONE ON IT**. Claimed but silent 90 min → **CHECK IN**. A "we are safe now" message → **SAYS SAFE NOW**. Still being shared after rescue → **RE-SHARED** with a ready reply to stop it. |
-| 🗺 **Live map** | Cases by urgency on OpenStreetMap; rescued cases turn green. |
-| 👥 **Works as a team** | Every action is an event in an append-only log. Volunteers' boards sync instantly (windows/tabs on one device today; any device with a small backend next). Export/import the log for shift handover. |
-| 📞 **Close the loop** | One-tap call, WhatsApp follow-up in Tamil + English ("Reply YES if still stuck, SAFE if you are out"). |
-| 📱 | Phone layout, dark mode, works offline without AI. |
+This has been tried before: in the 2018 Kerala floods, volunteers built keralarescue.in, an open-source rescue request site that the state adopted as its official one. FloodLine is a much smaller attempt at the same idea, built around how requests arrive in Chennai: forwarded WhatsApp messages, often in Tamil or Tanglish.
 
-| Case drawer: why it's ranked, merged reports, actions | Proof tab | Phone (dark) |
+## What it does
+
+- **Reads messages.** Rules pull out the area, phone numbers, number of people, water level and who is vulnerable (pregnant, needs medical care, baby, elderly, cannot walk). They work offline. With a Gemini key, Gemini re-reads each message to catch what rules miss, like landmarks ("near Phoenix mall" is Velachery) or "old couple" meaning two people.
+- **Checks the AI.** Anything Gemini returns that isn't in the original message — a phone number, an unknown area, an address nobody wrote — is not used, and the request shows what was dropped.
+- **Groups repeats.** Messages with the same phone number, or the same door number and street in the same area, become one request. It says why they were grouped.
+- **Orders by urgency, with points you can see.** Pregnant or in labour +40, medical +40, neck-deep water +35, baby +25, elderly +20, cannot walk +20, on a terrace +20, plus time waiting and number of reports.
+- **Keeps track.** A request nobody takes for 45 minutes is marked. A taken request with no update for 90 minutes is marked. A later "we are safe" message, or people still sharing after a rescue, is marked too, with a reply in Tamil and English that volunteers can copy.
+- **Works as a team.** Every action is saved as an event. Boards update instantly across windows on the same device, and the whole board can be downloaded and loaded on another device for a shift handover.
+- Map of requests (OpenStreetMap), call and WhatsApp buttons, a Tamil + English message asking the family if they still need help, phone layout, dark mode. The helpline numbers (112, 1070, 1077, 1913) are always shown at the top.
+
+| Request details | Results page | Phone |
 |---|---|---|
-| ![Case](docs/screenshots/2-case-drawer.jpg) | ![Proof](docs/screenshots/3-proof.jpg) | ![Mobile](docs/screenshots/4-mobile-dark.jpg) |
+| ![Request](docs/screenshots/request.jpg) | ![Results](docs/screenshots/results.jpg) | ![Phone](docs/screenshots/phone.jpg) |
 
-## Does it actually help? (the Proof tab)
+## Does it help?
 
-The same simulated flood night is replayed twice with the same 10 boats: once the way volunteer groups work today, once with FloodLine. FloodLine's **real** extractor and duplicate matcher run on every message; all assumptions are settings in the app.
+I can't test this in a real flood, so the Results page plays the same simulated night twice with the same ten boats: once the way groups coordinate today (read the chat top to bottom, call back, post in the boat group), and once with FloodLine. FloodLine's real code reads every message. All the assumptions can be changed on the page.
 
-**Average over 20 simulated nights** (110 households, ~290 messages each, 10 boats):
+Averages over 20 simulated nights, 110 households each:
 
-| | Manual | FloodLine | FloodLine better on |
+| | Today's way | With FloodLine | Nights better / worse |
 |---|---|---|---|
-| Households never reached | 26.8 | **1.1** | 20 / 20 nights |
-| Critical cases waiting 3h+ or never reached | 14.0 | **6.7** | 18 / 20 (worse on 2) |
-| Boat trips wasted on a family already rescued | 26.7 | **0.4** | 20 / 20 |
-| Boat trips to families who had already got out | 6.9 | **1.2** | 18 / 20 |
-| Median wait, critical cases reached | 1h 01m | 1h 06m | worse on 14 / 20 |
+| Households no boat ever reached | 26.8 | 1.2 | 20 / 0 |
+| Critical households that waited over 3 hours or were never reached | 14.0 | 6.5 | 18 / 2 |
+| Boat trips to a family already rescued | 26.7 | 0.4 | 20 / 0 |
+| Boat trips to a family that had already got out | 6.9 | 1.2 | 18 / 0 |
+| Median wait, critical households that were reached | 1h 01m | 1h 06m | 6 / 14 |
+| Median wait, everyone who was reached | 2h 42m | 2h 51m | 8 / 11 |
 
-The median wait is only over households that were *reached*: manual coordination leaves ~27 households unreached and they never enter its median. Serving critical cases first also means low-risk families wait longer. Both trade-offs are shown in the app, not hidden.
+The median waits are slightly worse with FloodLine. Two reasons: the medians only count households that were reached, and today's way never reaches about 27 of them; and FloodLine sends boats to critical households first, so lower-risk ones wait longer.
 
-**How well does it read messy messages?**
+How well it reads messages:
 
-| Test set | Rules (offline) | Gemini + guardrails |
-|---|---|---|
-| Generated night (269 messages, known answers) | 100% on every field (easy: phrasing the rules know) | — |
-| **Hard set**: 30 hand-written messages the rules were never tuned on | **90.3%** overall (area 96.7%, phone 100%, water 100%, **people count 37.5%**) | run it in the Proof tab with your key |
+- On the 269 generated messages, rules get every field right. That is easy for them, because the generator uses phrasings the rules know.
+- On 30 messages I wrote and labelled by hand to look like real ones (landmarks, Tamil number words, typos), and did not tune the rules on, rules get 90.3% of fields right — but only 37.5% of head counts. This is where Gemini is meant to help; its score can be measured on the Results page with a key.
+- Grouping repeats on the generated night: 230 request messages became 110 households, which is the true number.
 
-Duplicate matching on the generated night: 230 reports → 110 cases for 110 real households (precision 100%, recall 100%).
+These are simulations. They show what better coordination can do under the stated assumptions, not what happened in a real flood.
 
-> The night is simulated with realistic but fictional names and numbers. It shows the coordination effect under stated assumptions; it is not a field result.
+## Limits
+
+- Different phones can't share a board yet; that needs a small server.
+- It knows 28 flood-prone Chennai localities. Pins are at the locality, not the house.
+- It reads text only, not voice notes or photos.
+- It has not been used in a real flood.
 
 ## Run it
 
-Static site, no build step, no server.
+No build step and no server.
 
 ```bash
-python -m http.server 8000      # open http://localhost:8000
-node --test test/core.test.mjs  # 16 unit tests
+python -m http.server 8000      # then open http://localhost:8000
+node --test test/core.test.mjs  # 17 unit tests
 ```
 
-Optional: ⚙️ → paste a free Gemini key from https://aistudio.google.com/apikey. The key stays in your browser.
+Gemini is optional: Settings → paste a key from https://aistudio.google.com/apikey. The key stays in the browser.
 
-## How it works
-
-```
-messages ─► splitMessages ─► extractRules (instant, offline) ─┬─► event log (append-only) ─► buildState ─► board / map / drawer
-                                     │                         │        ▲  sync between volunteers
-                                     └─► Gemini (optional) ─► guardAi ─┘        (BroadcastChannel, export/import)
-buildState = clusterReports (merge repeats) + scoreCase (ranked reasons) + flags (stale, check-in, says-safe, re-shared)
-```
-
-All logic is pure JavaScript in `js/core/` and unit-tested; the UI only renders it. Details for judges: [docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md).
+## Code
 
 ```
-index.html, css/style.css
-js/app.js        board, replay, inbox, drawer, sync      js/bench.js   Proof tab
-js/map.js        Leaflet map                             js/gemini.js  Gemini call
-js/core/         extract · dedupe · priority · store · prompt (AI guardrails) · sim (night + benchmark) · gazetteer · hardset · input
-test/            unit tests
+js/core/extract.js    reads one message with rules
+js/core/prompt.js     Gemini prompt, and the checks on what Gemini returns
+js/core/dedupe.js     groups messages about the same household
+js/core/priority.js   points and their reasons
+js/core/store.js      event log → current board (status, warnings)
+js/core/sim.js        simulated night and the today-vs-FloodLine comparison
+js/core/hardset.js    the 30 hand-labelled test messages
+js/app.js, bench.js, map.js, gemini.js   the page
 ```
 
-Built with JavaScript, Leaflet + OpenStreetMap, Google Gemini API, GitHub Pages. License: MIT.
+Everything in `js/core/` is plain functions with unit tests. More detail: [docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md).
+
+Made by Nethra R. MIT licence. Map data © OpenStreetMap contributors.

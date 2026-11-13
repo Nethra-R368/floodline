@@ -238,3 +238,14 @@ test('pasted text splits into messages (blank lines or WhatsApp export)', () => 
   assert.equal(wa[1].text, 'Stay safe');
   assert.deepEqual(splitMessages('   '), []);
 });
+
+test('a family that says it is safe is listed after families still waiting', () => {
+  const ev = [
+    { t: 'report', id: 'a', at: 0, text: 'x', x: extractRules('URGENT 4 people stuck No. 12, Gandhi Street, Velachery, water neck, pregnant lady. 9840012345') },
+    { t: 'report', id: 'b', at: 1, text: 'x', x: extractRules('2 people stuck No. 3, Lake View Road, Tambaram, knee water 9840055555') },
+    { t: 'report', id: 'c', at: 2, text: 'x', x: extractRules('Velachery Gandhi Street family is safe now, stop sharing 9840012345') },
+  ];
+  const s = buildState(ev, 10);
+  assert.deepEqual(s.cases.map((c) => c.id), ['b', 'a']);
+  assert.ok(s.cases[1].flags.includes('says-safe'));
+});

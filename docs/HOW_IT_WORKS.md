@@ -35,9 +35,9 @@ Every action (`report`, `extract`, `claim`, `status`) is an immutable event with
 | Q | A |
 |---|---|
 | Isn't this just AI translating messages? | No. Reading is step 2 of 7. The value is the shared state: merge repeats, rank with reasons, track ownership, flag what's forgotten, close the loop. It works with no AI at all. |
-| What if the AI invents a phone number? | It is blocked: every AI phone must appear in the message digits (unit-tested). The board shows "🛡 Blocked phone … not in the message". |
+| What if the AI invents a phone number? | It is blocked: every AI phone must appear in the message digits (unit-tested). The board shows "Not used: phone … not in the message". |
 | What if there's no internet for AI? | Rules work offline; AI only improves extractions later. |
-| Is the benchmark rigged? | All assumptions are editable in the Proof tab; the 20-night table shows where FloodLine is worse (median wait for low-risk families). The extractor is not tuned on the hard set; on it rules score 90.3% and only 37.5% on people counts. |
+| Is the benchmark rigged? | All assumptions are editable in the Results page; the 20-night table shows where FloodLine is worse (median wait for low-risk families). The extractor is not tuned on the hard set; on it rules score 90.3% and only 37.5% on people counts. |
 | Why rules and AI, not just AI? | Speed (instant), offline, cost, and a check on the AI. |
 | Privacy? | No FloodLine server. Data stays in the volunteer's browser; with Gemini on, message text goes to Google's API only. Demo data is fictional. |
-| What's next? | Cross-device sync backend; SMS gateway intake for areas without data; street-level geocoding; Tamil voice-note transcription; a pilot with a volunteer group during the monsoon. |
+| What's next? | Cross-device sync server; SMS gateway intake for areas without data; street-level geocoding; Tamil voice-note transcription; a pilot with a volunteer group during the monsoon. |
