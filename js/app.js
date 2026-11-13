@@ -39,7 +39,7 @@ let night = null;
 const seenCases = new Set();
 let firstRender = true;
 const me = { name: store.get('floodline.me') || '' };
-const ai = { key: store.get('floodline.key') || '', model: store.get('floodline.model') || 'gemini-2.5-flash', use: store.get('floodline.useAi') !== '0' };
+const ai = { key: store.get('floodline.key') || '', model: store.get('floodline.model') || 'gemini-3.8-flash', use: store.get('floodline.useAi') !== '0' };
 
 function loadWorkspace(name) {
   try {
@@ -437,7 +437,7 @@ els.settingsBtn.addEventListener('click', () => {
 els.settingsDialog.addEventListener('close', () => {
   if (els.settingsDialog.returnValue !== 'save') return;
   ai.key = els.apiKey.value.trim();
-  ai.model = els.model.value.trim() || 'gemini-2.5-flash';
+  ai.model = els.model.value.trim() || 'gemini-3.8-flash';
   ai.use = els.useAi.checked;
   if (els.rememberKey.checked && ai.key) store.set('floodline.key', ai.key); else store.remove('floodline.key');
   store.set('floodline.model', ai.model);
