@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <title>FloodLine: nobody gets forgotten</title>
+  <meta name="description" content="Turns the flood of messy SOS messages in a disaster into one shared rescue board: duplicates merged, the most urgent first, every request tracked until someone confirms the rescue." />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌊</text></svg>" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <link rel="stylesheet" href="css/style.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="logo">🌊</span><span>FloodLine</span><span class="tag">nobody gets forgotten</span></div>
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-view="board" role="tab" aria-selected="true">Board</button>
+      <button class="tab" data-view="bench" role="tab" aria-selected="false">Proof</button>
+      <button class="tab" data-view="about" role="tab" aria-selected="false">How it works</button>
+    </nav>
+    <div class="top-right">
+      <select id="workspace" aria-label="Workspace">
+        <option value="demo">Demo night (simulated)</option>
+        <option value="live">Live (real messages)</option>
+      </select>
+      <span id="presence" class="presence" title="Volunteers with FloodLine open in this browser">● 1 online</span>
+      <button id="meBtn" class="chip-btn" type="button" title="Your volunteer name">👤 <span id="meName">Set name</span></button>
+      <button id="settingsBtn" class="icon-btn" type="button" aria-label="AI settings">⚙️</button>
+      <button id="themeBtn" class="icon-btn" type="button" aria-label="Switch theme">🌙</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- ================= BOARD ================= -->
+    <section id="boardView" class="view">
+      <div class="statusbar">
+        <div class="clock"><span class="muted small" id="clockLabel">Night of the flood</span><b id="clock">20:00</b></div>
+        <div class="stats" id="stats"></div>
+        <div class="replay" id="replayCtl">
+          <button id="playBtn" class="primary" type="button">▶ Play the night</button>
+          <select id="speed" aria-label="Replay speed">
+            <option value="2">2 min/sec</option>
+            <option value="5" selected>5 min/sec</option>
+            <option value="12">12 min/sec</option>
+          </select>
+          <label class="check small" title="Simulated boats take the top case automatically, like real teams would"><input type="checkbox" id="autoBoats" checked /> 10 boats auto-dispatch</label>
+          <button id="resetBtn" class="ghost small-btn" type="button">↺ Reset</button>
+        </div>
+      </div>
+
+      <div class="board">
+        <aside class="col inbox-col">
+          <div class="panel">
+            <div class="panel-head"><h2>📥 Inbox</h2><span class="muted small" id="aiState">rules only</span></div>
+            <textarea id="pasteBox" rows="6" placeholder="Paste SOS messages from WhatsApp / X / SMS here. One or many: separate messages with a blank line.&#10;&#10;e.g. Velacheri la 4 per maatikitom, kazhuthu alavu thanni, pregnant lady irukanga 9003012345"></textarea>
+            <div class="row">
+              <button id="addBtn" class="primary" type="button">Add to board</button>
+              <button id="sampleBtn" class="ghost small-btn" type="button">Try messy examples</button>
+            </div>
+            <p id="inboxStatus" class="small muted" role="status" aria-live="polite"></p>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><h2>🛶 Help offered</h2><span class="muted small" id="offerCount">0</span></div>
+            <ul id="offers" class="offers"></ul>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><h2>💬 Latest messages</h2></div>
+            <ul id="feed" class="feed"></ul>
+          </div>
+        </aside>
+
+        <section class="col queue-col">
+          <div class="queue-head">
+            <div class="filters" role="tablist" aria-label="Filter cases">
+              <button class="filter active" data-filter="action">Needs action <span id="fAction"></span></button>
+              <button class="filter" data-filter="assigned">Assigned <span id="fAssigned"></span></button>
+              <button class="filter" data-filter="done">Done <span id="fDone"></span></button>
+              <button class="filter" data-filter="all">All</button>
+            </div>
+            <input id="search" type="search" placeholder="Search area, street, phone…" aria-label="Search cases" />
+          </div>
+          <ol id="queue" class="queue"></ol>
+          <p id="emptyQueue" class="empty hidden">No cases here. Paste messages in the inbox, or press <b>▶ Play the night</b>.</p>
+        </section>
+
+        <section class="col map-col">
+          <div id="map" class="map" aria-label="Map of rescue requests"></div>
+          <div class="legend small">
+            <span><i class="dot critical"></i>Critical</span><span><i class="dot high"></i>High</span><span><i class="dot medium"></i>Medium</span><span><i class="dot low"></i>Low</span><span><i class="dot done"></i>Rescued</span>
+            <span class="muted">· pins are locality-level</span>
+          </div>
+        </section>
+      </div>
+      <div class="mobile-switch">
+        <button class="ms active" data-col="queue-col">Queue</button>
+        <button class="ms" data-col="map-col">Map</button>
+        <button class="ms" data-col="inbox-col">Inbox</button>
+      </div>
+    </section>
+
+    <!-- ================= PROOF / BENCHMARK ================= -->
+    <section id="benchView" class="view hidden">
+      <div class="bench-intro">
+        <h1>Does it actually help? The proof.</h1>
+        <p class="muted">The same flood night is replayed twice with the same boats: once the way volunteer groups work today (read the chat in order, phone back, post in the boat group), once with FloodLine. FloodLine's <b>real</b> extractor and duplicate matcher run on every message. Every assumption is a setting below.</p>
+      </div>
+      <form id="benchForm" class="bench-params panel">
+        <label>Households in trouble <input type="number" name="households" min="20" max="300" value="110" /></label>
+        <label>Boats <input type="number" name="boats" min="1" max="40" value="10" /></label>
+        <label>Volunteers reading the chat <input type="number" name="volunteers" min="1" max="20" value="3" /></label>
+        <label>Minutes to handle one message <input type="number" name="minutesPerMessage" min="0.5" max="10" step="0.5" value="2.5" /></label>
+        <label>Chance a volunteer spots a repost <input type="number" name="manualRepeatCatch" min="0" max="1" step="0.05" value="0.4" /></label>
+        <label>Random seed <input type="number" name="seed" value="2023" /></label>
+        <button class="primary" type="submit">Run the night</button>
+        <button class="ghost small-btn" type="button" id="seedsBtn">Run 20 different nights</button>
+      </form>
+      <div id="benchResults"></div>
+      <div class="panel">
+        <div class="panel-head"><h2>🎯 How well does it read messy messages?</h2></div>
+        <p class="small muted">Two test sets. <b>Generated</b>: every message of the simulated night, with known answers (easy: same phrasing families the rules know). <b>Hard set</b>: 30 hand-written, hand-labelled messages the rules were never tuned on: landmarks instead of area names, Tamil number words, typos, loose offers.</p>
+        <div id="accuracy"></div>
+        <div class="row"><button id="aiHardBtn" class="secondary" type="button">Run Gemini on the hard set</button><span id="aiHardStatus" class="small muted"></span></div>
+        <div id="misses"></div>
+      </div>
+    </section>
+
+    <!-- ================= ABOUT ================= -->
+    <section id="aboutView" class="view hidden">
+      <article class="about panel">
+        <h1>Why FloodLine exists</h1>
+        <p>When Chennai floods, phone lines fail and rescue requests move to WhatsApp, X and Instagram. Volunteers read them by hand. The same family gets posted ten times by relatives, so boats go to one house twice while another request scrolls away unread. Nobody knows which requests were handled, so old messages keep being shared after the family is safe.</p>
+        <p>FloodLine is one shared board that tracks every request until someone confirms a rescue.</p>
+        <ol class="how-list">
+          <li><b>Read anything.</b> Paste messages in English, Tamil or Tanglish. Rules extract area, phone, people, water level and who is vulnerable instantly and offline; Gemini then reads landmarks and loose phrasing, and every AI answer is checked against the original text so it can't invent a phone number or place.</li>
+          <li><b>Merge repeats.</b> Reports with the same phone or same street + door number become one case, and the merge reason is shown.</li>
+          <li><b>Rank by urgency, with reasons.</b> Pregnant, medical, babies, neck-deep water, waiting time. Every point is explained.</li>
+          <li><b>Nobody gets forgotten.</b> Unclaimed for 45 minutes turns red. Claimed with no update for 90 minutes asks for a check-in. A "we are safe" message or a repost after rescue is flagged, with a ready reply to stop the sharing.</li>
+          <li><b>Works as a team.</b> Every action is an event; volunteers' boards sync instantly (tabs on one device today, any device with a small backend next), and the full log can be exported for handover.</li>
+        </ol>
+        <p class="small muted">Prototype. Locations are locality-level. Demo data is simulated (realistic but fictional names and numbers); no real person's data is used.</p>
+      </article>
+    </section>
+  </main>
+
+  <!-- case drawer -->
+  <div id="drawerBack" class="drawer-back hidden"></div>
+  <aside id="drawer" class="drawer hidden" aria-label="Case details" role="dialog" aria-modal="true"></aside>
+
+  <dialog id="settingsDialog">
+    <form method="dialog" class="settings">
+      <h3>🤖 AI reading (Google Gemini)</h3>
+      <p class="small muted">Optional. Without a key FloodLine still works with rules, offline. With a key, Gemini re-reads each message to catch landmarks, Tamil numbers and loose phrasing; guardrails reject anything not in the message.</p>
+      <label>Gemini API key <input id="apiKey" type="password" autocomplete="off" placeholder="Paste your key from aistudio.google.com/apikey" /></label>
+      <label class="check"><input id="rememberKey" type="checkbox" /> Remember on this device</label>
+      <label>Model <input id="model" type="text" value="gemini-2.5-flash" /></label>
+      <label class="check"><input id="useAi" type="checkbox" checked /> Use Gemini for pasted messages</label>
+      <div class="row"><button class="primary" value="save">Save</button><button class="ghost" value="cancel">Cancel</button></div>
+      <hr />
+      <h3>📦 Handover</h3>
+      <p class="small muted">Export the full event log (every message and action) to pass to the next shift or another device.</p>
+      <div class="row"><button id="exportBtn" class="secondary" type="button">⬇ Export log</button><label class="secondary file-btn">⬆ Import log<input id="importFile" type="file" accept="application/json" hidden /></label></div>
+    </form>
+  </dialog>
+
+  <dialog id="nameDialog">
+    <form method="dialog" class="settings">
+      <h3>Who are you?</h3>
+      <p class="small muted">Your name is shown on cases you take, so others know who to ask.</p>
+      <label>Volunteer name <input id="nameInput" type="text" maxlength="30" placeholder="e.g. Nethra / Boat team 3" /></label>
+      <div class="row"><button class="primary" value="ok">Save</button></div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
