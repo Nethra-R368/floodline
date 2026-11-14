@@ -15,6 +15,9 @@ const METRICS = [
   { key: 'lostMessages', label: 'Messages that scrolled away before anyone read them' },
 ];
 
+// Last recorded Gemini run on the hand-labelled set (README has the details).
+const MEASURED = { date: '14 November 2026', model: 'gemini-3.6-flash', overall: 98.6, fields: { kind: 100, area: 96.7, phones: 100, people: 100, vulnerable: 95.7, water: 100 } };
+
 const show = (v, time) => (v == null ? '—' : time ? fmtMinutes(v) : String(v));
 
 function verdict(m, f, time) {
@@ -93,9 +96,10 @@ export function initBench({ getAi }) {
     const genMap = { kind: gen.kind, area: gen.area, phones: gen.phone, people: gen.people, vulnerable: gen.vulnerable, water: gen.water };
     const cell = (v) => (v == null ? '—' : `${v}%`);
     $('accuracy').innerHTML = `<table class="cmp"><thead><tr><th>Field</th><th>Generated night, rules</th><th>Hard set, rules</th><th>Hard set, Gemini + checks</th></tr></thead><tbody>
-      ${fields.map(([k, label]) => `<tr><td>${label}</td><td class="n">${cell(genMap[k])}</td><td class="n">${cell(rules.fields[k])}</td><td class="n">${aiHard ? cell(aiHard.fields[k]) : '<span class="muted">not run</span>'}</td></tr>`).join('')}
-      <tr><td><b>All fields</b></td><td class="n"></td><td class="n"><b>${rules.overall}%</b></td><td class="n">${aiHard ? `<b>${aiHard.overall}%</b>` : ''}</td></tr>
+      ${fields.map(([k, label]) => `<tr><td>${label}</td><td class="n">${cell(genMap[k])}</td><td class="n">${cell(rules.fields[k])}</td><td class="n">${cell((aiHard || MEASURED).fields[k])}</td></tr>`).join('')}
+      <tr><td><b>All fields</b></td><td class="n"></td><td class="n"><b>${rules.overall}%</b></td><td class="n"><b>${(aiHard || MEASURED).overall}%</b></td></tr>
       </tbody></table>
+      <p class="note">${aiHard ? 'Gemini column: the run you just did.' : `Gemini column: measured on ${MEASURED.date} with ${MEASURED.model}. Its two mistakes: an Adyar river warning placed in Kotturpuram, and a woman in labour also marked as needing medical care. Press the button below to run it again with your own key.`}</p>
       <p class="note">Grouping repeats on the generated night: ${dd.reports} request messages became ${dd.clusters} households; there were really ${dd.households}. (Precision ${dd.precision}%, recall ${dd.recall}%.)</p>`;
     const src = aiHard || rules;
     $('misses').innerHTML = `<h2>What ${aiHard ? 'Gemini' : 'the rules'} still get wrong on the hard set</h2>
