@@ -4,6 +4,10 @@ A rescue request tracker for volunteer groups during Chennai floods.
 
 Volunteers paste the rescue requests that arrive on WhatsApp, X and SMS. FloodLine reads them (English, Tamil or Tanglish), groups repeats of the same household, puts the most urgent at the top with the reasons written out, and keeps each request on the list until someone marks the family as rescued.
 
+Demo video (5 min): https://youtu.be/dKdgLOt9mkk
+
+[![FloodLine demo video](https://img.youtube.com/vi/dKdgLOt9mkk/hqdefault.jpg)](https://youtu.be/dKdgLOt9mkk)
+
 Live: https://nethra-r368.github.io/floodline/ — it opens on a practice board with a simulated night. Press "Start the night". Every name and phone number on the practice board is made up.
 
 ![The request board during a practice night](docs/screenshots/board.jpg)
