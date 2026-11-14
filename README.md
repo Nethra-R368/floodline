@@ -52,7 +52,8 @@ The median waits are slightly worse with FloodLine. Two reasons: the medians onl
 How well it reads messages:
 
 - On the 269 generated messages, rules get every field right. That is easy for them, because the generator uses phrasings the rules know.
-- On 30 messages I wrote and labelled by hand to look like real ones (landmarks, Tamil number words, typos), and did not tune the rules on, rules get 90.3% of fields right — but only 37.5% of head counts. This is where Gemini is meant to help; its score can be measured on the Results page with a key.
+- On 30 messages I wrote and labelled by hand to look like real ones (landmarks, Tamil number words, typos), and did not tune the rules on, rules get 90.3% of fields right — but only 37.5% of head counts.
+- On the same 30 messages, Gemini (gemini-3.6-flash, run on November 14, 2026) with FloodLine's checks gets **98.6%** of fields right, and **100%** of head counts ("old couple", "my amma alone", Tamil "மூன்று பேர்"). Its two mistakes: it placed an Adyar river advisory in Kotturpuram (the bridge it mentions), and it marked a woman in labour as needing medical care as well as pregnant. Nothing it returned had to be blocked on this run. You can repeat the test on the Results page with your own key.
 - Grouping repeats on the generated night: 230 request messages became 110 households, which is the true number.
 
 These are simulations. They show what better coordination can do under the stated assumptions, not what happened in a real flood.
