@@ -1,0 +1,13 @@
+{
+  "name": "FloodLine — rescue request tracker",
+  "short_name": "FloodLine",
+  "description": "Rescue request tracker for volunteer groups during Chennai floods. Works offline; reads messages with Gemini on the device when possible.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f3f2ee",
+  "theme_color": "#b42318",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

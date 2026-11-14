@@ -4,7 +4,7 @@ import { fmtMinutes } from './core/priority.js';
 import { generateNight, tripMinutes } from './core/sim.js';
 import { splitMessages } from './core/input.js';
 import { HARD_SET } from './core/hardset.js';
-import { extractWithGemini } from './gemini.js';
+import { isConfigured, deviceStatus, prepareDevice, readMessages } from './ai.js';
 import { createMap } from './map.js';
 import { initBench } from './bench.js';
 import { $, esc, store, toast, copyText } from './util.js';
@@ -17,7 +17,7 @@ const TAB = Math.random().toString(36).slice(2, 8);
 
 const els = {
   workspace: $('workspace'), presence: $('presence'), meBtn: $('meBtn'), meName: $('meName'), themeBtn: $('themeBtn'),
-  settingsBtn: $('settingsBtn'), settingsDialog: $('settingsDialog'), apiKey: $('apiKey'), rememberKey: $('rememberKey'), model: $('model'), useAi: $('useAi'),
+  settingsBtn: $('settingsBtn'), settingsDialog: $('settingsDialog'), aiMode: $('aiMode'), aiCloudState: $('aiCloudState'), aiDeviceState: $('aiDeviceState'), prepareBtn: $('prepareBtn'), netState: $('netState'),
   nameDialog: $('nameDialog'), nameInput: $('nameInput'),
   clock: $('clock'), clockLabel: $('clockLabel'), stats: $('stats'), replayCtl: $('replayCtl'), play: $('playBtn'), speed: $('speed'), autoBoats: $('autoBoats'), reset: $('resetBtn'),
   paste: $('pasteBox'), add: $('addBtn'), sampleBtn: $('sampleBtn'), inboxStatus: $('inboxStatus'), aiState: $('aiState'),
@@ -39,7 +39,7 @@ let night = null;
 const seenCases = new Set();
 let firstRender = true;
 const me = { name: store.get('floodline.me') || '' };
-const ai = { key: store.get('floodline.key') || '', model: store.get('floodline.model') || 'gemini-3.8-flash', use: store.get('floodline.useAi') !== '0' };
+const ai = { mode: ['auto', 'device', 'cloud', 'off'].includes(store.get('floodline.aiMode')) ? store.get('floodline.aiMode') : 'auto', device: 'unsupported' };
 
 function loadWorkspace(name) {
   try {
@@ -183,17 +183,18 @@ async function addPasted() {
   els.paste.value = '';
   const kinds = evs.reduce((m, e) => ({ ...m, [e.x.kind]: (m[e.x.kind] || 0) + 1 }), {});
   els.inboxStatus.textContent = `Added ${evs.length} message${evs.length > 1 ? 's' : ''}: ${Object.entries(kinds).map(([k, n]) => `${n} ${k}`).join(', ')}.`;
-  if (ai.use && ai.key) {
+  if (ai.mode !== 'off' && isConfigured()) {
     els.inboxStatus.textContent += ' Gemini is re-reading them…';
     try {
-      const xs = await extractWithGemini(evs.map((e) => e.text), ai.key, ai.model);
+      const { xs, where } = await readMessages(evs.map((e) => e.text), ai.mode);
       const later = nowMin();
       addEvents(xs.map((x, i) => ({ t: 'extract', id: eventId('x'), at: later, reportId: evs[i].id, x })));
-      const blocked = xs.reduce((s, x) => s + (x.guard ? x.guard.filter((g) => /Blocked|Ignored/.test(g)).length : 0), 0);
+      const blocked = xs.reduce((n, x) => n + (x.guard ? x.guard.filter((g) => /Blocked|Ignored/.test(g)).length : 0), 0);
       const changed = xs.filter((x, i) => JSON.stringify([x.kind, x.areaId, x.people, x.water, x.vulnerable]) !== JSON.stringify([evs[i].x.kind, evs[i].x.areaId, evs[i].x.people, evs[i].x.water, evs[i].x.vulnerable])).length;
-      els.inboxStatus.textContent = `Added ${evs.length}. Gemini re-read them and corrected ${changed}.${blocked ? ` ${blocked} detail${blocked === 1 ? '' : 's'} it gave ${blocked === 1 ? 'was' : 'were'} not in the messages, so ${blocked === 1 ? 'it was' : 'they were'} not used.` : ''}`;
+      const place = where.device && where.cloud ? 'partly on this device, partly in the cloud' : where.device ? 'on this device (Gemini Nano, no internet needed)' : 'in the cloud (Gemini)';
+      els.inboxStatus.textContent = `Added ${evs.length}. Gemini re-read them ${place} and corrected ${changed}.${blocked ? ` ${blocked} detail${blocked === 1 ? '' : 's'} it gave ${blocked === 1 ? 'was' : 'were'} not in the messages, so ${blocked === 1 ? 'it was' : 'they were'} not used.` : ''}`;
     } catch (err) {
-      els.inboxStatus.textContent = `Added ${evs.length}, read by rules only. Gemini didn't respond: ${err.message}`;
+      els.inboxStatus.textContent = `Added ${evs.length}, read by rules only. ${err.message}`;
     }
   }
 }
@@ -303,9 +304,7 @@ function render() {
   mapApi.update(state.cases);
   state.cases.forEach((c) => seenCases.add(c.id));
   firstRender = false;
-  els.aiState.textContent = ai.key && ai.use
-    ? 'Messages are read by rules first, then checked by Gemini.'
-    : 'Messages are read by rules, offline. Add a Gemini key in Settings to catch landmarks and loose wording.';
+  els.aiState.textContent = aiStateText();
   if (openCaseId) renderDrawer();
 }
 
@@ -356,7 +355,7 @@ function renderDrawer() {
   const total = c.reasons.reduce((s, r) => s + r.points, 0);
   const points = c.reasons.map((r) => `<tr><td>${esc(r.label)}</td><td>${r.points > 0 ? '+' : ''}${r.points}</td></tr>`).join('')
     + `<tr class="total"><td>Priority: ${PRIO[c.tier].toLowerCase()}</td><td>${total}</td></tr>`;
-  const reports = c.reports.map((r) => `<div class="msg"><div class="meta">${fmtClock(r.at)} · ${esc(r.source || '')} · read by ${r.x.source === 'ai' ? 'Gemini (checked)' : 'rules'}</div>${esc(r.text)}${(r.x.guard || []).filter((g) => /Blocked|Ignored/.test(g)).map((g) => `<div class="blocked">Not used: ${esc(g.replace(/^(Blocked|Ignored)\s*/, ''))}</div>`).join('')}</div>`).join('');
+  const reports = c.reports.map((r) => `<div class="msg"><div class="meta">${fmtClock(r.at)} · ${esc(r.source || '')} · read by ${r.x.source !== 'ai' ? 'rules' : r.x.where === 'device' ? 'Gemini Nano on this device (checked)' : 'Gemini in the cloud (checked)'}</div>${esc(r.text)}${(r.x.guard || []).filter((g) => /Blocked|Ignored/.test(g)).map((g) => `<div class="blocked">Not used: ${esc(g.replace(/^(Blocked|Ignored)\s*/, ''))}</div>`).join('')}</div>`).join('');
   const mergeWhy = [...new Set(c.merges.map((m) => m.why))];
   const history = c.history.map((h) => `<li><span class="mono">${fmtClock(h.at)}</span>${esc(h.by || '')} ${h.t === 'claim' ? 'took this request' : `marked it “${STATUS[h.status] || 'reopened'}”`}${h.note ? ` — ${esc(h.note)}` : ''}</li>`).join('');
 
@@ -427,23 +426,54 @@ els.nameDialog.addEventListener('close', () => {
   if (els.nameDialog.returnValue === 'ok' && v) { me.name = v; store.set('floodline.me', v); updateMe(); send({ type: 'hello', name: me.name }); }
 });
 
+function aiStateText() {
+  if (ai.mode === 'off') return 'Messages are read by rules only (AI switched off in Settings).';
+  if (!isConfigured()) return 'Messages are read by rules, offline. AI reading is not set up on this copy.';
+  if (ai.device === 'available' && ai.mode !== 'cloud') return 'Messages are read by rules, then by Gemini Nano on this device: works with no internet, nothing leaves this device.';
+  if (ai.mode === 'device') return 'On-device AI is not ready on this browser yet (Settings), so messages are read by rules.';
+  return navigator.onLine ? 'Messages are read by rules, then by Gemini in the cloud. Prepare the on-device model in Settings to read them with no internet.' : 'Offline: messages are read by rules. Prepare the on-device model in Settings to use AI with no internet.';
+}
+
+const DEVICE_TEXT = {
+  available: 'Ready. Gemini Nano runs on this device.',
+  downloadable: 'Can be downloaded to this device (one time, a few GB).',
+  downloading: 'Downloading…',
+  unavailable: 'This device can't run it (needs desktop Chrome 139+ with enough memory).',
+  unsupported: 'Not available in this browser. Use desktop Chrome 139+ and turn on chrome://flags/#prompt-api-for-gemini-nano-multimodal-input.',
+};
+async function refreshAiStatus() {
+  ai.device = await deviceStatus();
+  els.aiDeviceState.textContent = DEVICE_TEXT[ai.device] || ai.device;
+  els.aiCloudState.textContent = !isConfigured() ? 'Not set up on this copy of FloodLine.' : navigator.onLine ? 'Ready (Firebase AI Logic).' : 'Offline right now.';
+  els.prepareBtn.disabled = !isConfigured() || !(ai.device === 'downloadable' || ai.device === 'downloading');
+  els.netState.classList.toggle('hidden', navigator.onLine);
+  scheduleRender();
+}
 els.settingsBtn.addEventListener('click', () => {
-  els.apiKey.value = ai.key;
-  els.rememberKey.checked = !!store.get('floodline.key');
-  els.model.value = ai.model;
-  els.useAi.checked = ai.use;
+  els.aiMode.value = ai.mode;
+  refreshAiStatus();
   els.settingsDialog.showModal();
 });
-els.settingsDialog.addEventListener('close', () => {
-  if (els.settingsDialog.returnValue !== 'save') return;
-  ai.key = els.apiKey.value.trim();
-  ai.model = els.model.value.trim() || 'gemini-3.8-flash';
-  ai.use = els.useAi.checked;
-  if (els.rememberKey.checked && ai.key) store.set('floodline.key', ai.key); else store.remove('floodline.key');
-  store.set('floodline.model', ai.model);
-  store.set('floodline.useAi', ai.use ? '1' : '0');
-  render();
+els.aiMode.addEventListener('change', () => {
+  ai.mode = els.aiMode.value;
+  store.set('floodline.aiMode', ai.mode);
+  scheduleRender();
 });
+els.prepareBtn.addEventListener('click', async () => {
+  els.prepareBtn.disabled = true;
+  els.aiDeviceState.textContent = 'Starting download…';
+  try {
+    await prepareDevice((pct) => { els.aiDeviceState.textContent = `Downloading Gemini Nano: ${pct}%`; });
+    toast('On-device AI is ready');
+  } catch (err) {
+    els.aiDeviceState.textContent = `Could not prepare it: ${err.message}`;
+  }
+  refreshAiStatus();
+});
+window.addEventListener('online', refreshAiStatus);
+window.addEventListener('offline', refreshAiStatus);
+refreshAiStatus();
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 
 els.exportBtn.addEventListener('click', () => {
   const blob = new Blob([JSON.stringify({ app: 'FloodLine', workspace: ws, exportedAt: new Date().toISOString(), events: W.events }, null, 1)], { type: 'application/json' });

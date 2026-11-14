@@ -249,3 +249,17 @@ test('a family that says it is safe is listed after families still waiting', () 
   assert.deepEqual(s.cases.map((c) => c.id), ['b', 'a']);
   assert.ok(s.cases[1].flags.includes('says-safe'));
 });
+
+import { EXTRACT_SCHEMA } from '../js/core/prompt.js';
+test('schema has no nulls and "not stated" values are ignored by the checks', () => {
+  const item = EXTRACT_SCHEMA.properties.items.items;
+  assert.ok(item.properties.water.enum.includes('none'));
+  assert.ok(!JSON.stringify(EXTRACT_SCHEMA).includes('null'));
+  const x = guardAi({ kind: 'request', area: '', name: '', people: 0, water: 'none', phones: [], vulnerable: [], needs: [], trapped: false, summary: '' }, 'Stuck in Adyar 3 people waist water 9840012345');
+  assert.equal(x.areaId, 'adyar');
+  assert.equal(x.people, 3);
+  assert.equal(x.water, 'waist');
+  assert.deepEqual(x.phones, ['9840012345']);
+  assert.equal(x.guard.length, 0, 'no warnings for "not stated" values');
+  assert.ok(buildExtractPrompt(['x']).includes('or 0 if not stated'));
+});

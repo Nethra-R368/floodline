@@ -2,7 +2,7 @@ import { generateNight, simulate, evaluateExtraction, evaluateDedupe, DEFAULT_SI
 import { extractRules } from './core/extract.js';
 import { HARD_SET, scoreHardSet } from './core/hardset.js';
 import { fmtMinutes } from './core/priority.js';
-import { extractWithGemini } from './gemini.js';
+import { isConfigured, readMessages } from './ai.js';
 import { $, esc } from './util.js';
 
 const METRICS = [
@@ -112,13 +112,13 @@ export function initBench({ getAi }) {
   $('aiHardBtn').addEventListener('click', async () => {
     const ai = getAi();
     const status = $('aiHardStatus');
-    if (!ai.key) { status.textContent = 'Add a Gemini key in Settings first.'; return; }
-    status.textContent = 'Sending the 30 messages to Gemini…';
+    if (!isConfigured()) { status.textContent = 'AI reading is not set up on this copy of FloodLine.'; return; }
+    status.textContent = 'Gemini is reading the 30 messages…';
     try {
-      const xs = await extractWithGemini(HARD_SET.map((h) => h.text), ai.key, ai.model, 10, (d, n) => { status.textContent = `Gemini has read ${d} of ${n}…`; });
+      const { xs, where } = await readMessages(HARD_SET.map((h) => h.text), ai.mode === 'off' ? 'auto' : ai.mode, (d, n, src) => { status.textContent = `Gemini has read ${d} of ${n} (${src === 'device' ? 'on this device' : 'in the cloud'})…`; });
       aiHard = scoreHardSet((t, i) => xs[i]);
       const blocked = xs.reduce((s, x) => s + (x.guard || []).filter((g) => /Blocked|Ignored/.test(g)).length, 0);
-      status.textContent = `Done. ${blocked} detail${blocked === 1 ? '' : 's'} Gemini gave were not in the messages, so they were not used.`;
+      status.textContent = `Done: ${where.device} read on this device, ${where.cloud} in the cloud. ${blocked} detail${blocked === 1 ? '' : 's'} not in the messages ${blocked === 1 ? 'was' : 'were'} not used.`;
       renderAccuracy(generateNight({ seed: params().seed, households: params().households }));
     } catch (err) {
       status.textContent = err.message;

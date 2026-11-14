@@ -11,6 +11,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&family=Noto+Sans+Tamil:wght@400;600&display=swap" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <link rel="manifest" href="manifest.webmanifest" />
   <link rel="stylesheet" href="css/style.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" defer></script>
 </head>
@@ -37,6 +38,7 @@
           <option value="live">Live board</option>
         </select>
       </label>
+      <span id="netState" class="presence hidden" style="color:var(--red);font-weight:600">Offline — still working</span>
       <span id="presence" class="presence">1 volunteer here</span>
       <button id="meBtn" class="textbtn" type="button">Volunteer: <span id="meName">add your name</span></button>
       <button id="settingsBtn" class="textbtn" type="button">Settings</button>
@@ -188,12 +190,18 @@
   <dialog id="settingsDialog">
     <form method="dialog" class="dlg">
       <h3>Reading messages with Gemini</h3>
-      <p class="note">Optional. Without a key FloodLine reads messages with rules, offline. With a key, Gemini re-reads each message and anything it says that isn't in the message is thrown away.</p>
-      <label>Gemini API key <input id="apiKey" type="password" autocomplete="off" placeholder="From aistudio.google.com/apikey" /></label>
-      <label class="inline"><input id="rememberKey" type="checkbox" /> Remember on this device</label>
-      <label>Model <input id="model" type="text" value="gemini-3.8-flash" /></label>
-      <label class="inline"><input id="useAi" type="checkbox" checked /> Use Gemini for pasted messages</label>
-      <div class="row"><button class="btn dark" value="save">Save</button><button class="textbtn" value="cancel">Cancel</button></div>
+      <p class="note">Rules always read every message first, offline. Gemini then re-reads them: on this device (Gemini Nano, works with no internet) when possible, otherwise in the cloud. Anything it says that isn't in the message is thrown away.</p>
+      <label>Where should Gemini read messages?
+        <select id="aiMode">
+          <option value="auto">On this device when possible, otherwise in the cloud</option>
+          <option value="device">Only on this device</option>
+          <option value="cloud">Only in the cloud</option>
+          <option value="off">Don't use AI (rules only)</option>
+        </select>
+      </label>
+      <p class="note"><b>On this device:</b> <span id="aiDeviceState">checking…</span></p>
+      <p class="note"><b>Cloud:</b> <span id="aiCloudState">checking…</span></p>
+      <div class="row"><button id="prepareBtn" class="btn" type="button">Prepare on-device model</button><button class="btn dark" value="close">Done</button></div>
       <hr />
       <h3>Handing over to the next shift</h3>
       <p class="note">Download everything on this board — every message and every action — as one file, and load it on another device.</p>
