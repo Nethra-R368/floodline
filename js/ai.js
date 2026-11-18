@@ -112,7 +112,7 @@ export async function readMessages(texts, mode = 'auto', onProgress = () => {}) 
       throw new Error(`AI could not read these messages: ${msg.slice(0, 140)}`);
     }
     const src = /on_device/i.test(result.response.inferenceSource || '') ? 'device' : 'cloud';
-    const part = parseExtractReply(result.response.text(), chunk).map((x) => ({ ...x, where: src }));
+    const part = parseExtractReply(result.response.text(), chunk, src).map((x) => ({ ...x, where: src }));
     where[src] += part.length;
     xs.push(...part);
     onProgress(Math.min(texts.length, i + size), texts.length, src);

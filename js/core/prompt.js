@@ -70,8 +70,12 @@ export const EXTRACT_SCHEMA = {
 /**
  * Combine an AI item with the rule-based extraction of the same text.
  * Returns the merged extraction plus `guard`: what was rejected and why.
+ * `where` is 'device' for Gemini Nano: the small on-device model only fills gaps the rules left for
+ * water level and vulnerable people (fields the rules read well), and is still trusted for area,
+ * head counts and message type, where the rules are weak.
  */
-export function guardAi(item, text, rules = extractRules(text)) {
+export function guardAi(item, text, rules = extractRules(text), where = 'cloud') {
+  const small = where === 'device';
   const guard = [];
   const ai = item && typeof item === 'object' ? item : {};
   const kind = KINDS.includes(ai.kind) ? ai.kind : rules.kind;
@@ -96,8 +100,10 @@ export function guardAi(item, text, rules = extractRules(text)) {
   }
 
   // Safety first: a vulnerable flag found by either side is kept (missing one costs more than an extra one).
-  const vulnerable = VULNERABLE.filter((v) => rules.vulnerable.includes(v) || asArr(ai.vulnerable).includes(v));
-  const water = WATER_LEVELS.includes(ai.water) ? ai.water : rules.water;
+  const aiVul = small && rules.vulnerable.length ? [] : asArr(ai.vulnerable);
+  const vulnerable = VULNERABLE.filter((v) => rules.vulnerable.includes(v) || aiVul.includes(v));
+  const aiWater = WATER_LEVELS.includes(ai.water) ? ai.water : null;
+  const water = small ? (rules.water || aiWater) : (aiWater || rules.water);
   const needs = NEEDS.filter((n) => rules.needs.includes(n) || asArr(ai.needs).includes(n));
 
   let address = rules.address;
@@ -131,7 +137,7 @@ export function guardAi(item, text, rules = extractRules(text)) {
 }
 
 /** Parse the model reply into one guarded extraction per message (rules fill any gaps). */
-export function parseExtractReply(reply, texts) {
+export function parseExtractReply(reply, texts, where = 'cloud') {
   let items = [];
   try {
     const body = String(reply || '');
@@ -144,6 +150,6 @@ export function parseExtractReply(reply, texts) {
   }
   return texts.map((t, i) => {
     const item = items.find((it) => it && Number(it.i) === i) || items[i];
-    return item ? guardAi(item, t) : { ...extractRules(t), guard: ['AI gave no answer for this message, used rules'] };
+    return item ? guardAi(item, t, extractRules(t), where) : { ...extractRules(t), guard: ['AI gave no answer for this message, used rules'] };
   });
 }

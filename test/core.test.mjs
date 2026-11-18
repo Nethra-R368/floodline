@@ -263,3 +263,17 @@ test('schema has no nulls and "not stated" values are ignored by the checks', ()
   assert.equal(x.guard.length, 0, 'no warnings for "not stated" values');
   assert.ok(buildExtractPrompt(['x']).includes('or 0 if not stated'));
 });
+
+test('on-device (Gemini Nano) answers only fill gaps for water and vulnerable', () => {
+  const text = 'Adyar 2 people, water at waist level, my thatha is 80. 9840011122';
+  const nano = { kind: 'request', area: 'adyar', people: 2, vulnerable: ['pregnant'], water: 'knee' };
+  const dev = guardAi(nano, text, undefined, 'device');
+  assert.equal(dev.water, 'waist');                 // rules found it, the small model does not override
+  assert.deepEqual(dev.vulnerable, ['elderly']);    // rules found a flag, no extra flags from the small model
+  const cloud = guardAi(nano, text);                // cloud model keeps the old behaviour
+  assert.equal(cloud.water, 'knee');
+  assert.ok(cloud.vulnerable.includes('pregnant') && cloud.vulnerable.includes('elderly'));
+  const gap = guardAi({ ...nano, vulnerable: ['elderly'] }, 'Adyar 2 people stuck. 9840011122', undefined, 'device');
+  assert.equal(gap.water, 'knee');                  // nothing from rules: the small model fills the gap
+  assert.deepEqual(gap.vulnerable, ['elderly']);
+});
