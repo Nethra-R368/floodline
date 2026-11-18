@@ -24,7 +24,7 @@ This has been tried before: in the 2018 Kerala floods, volunteers built keralare
 
 ## What it does
 
-- **Reads messages.** Rules pull out the area, phone numbers, number of people, water level and who is vulnerable (pregnant, needs medical care, baby, elderly, cannot walk). They work offline. With a Gemini key, Gemini re-reads each message to catch what rules miss, like landmarks ("near Phoenix mall" is Velachery) or "old couple" meaning two people.
+- **Reads messages.** Rules pull out the area, phone numbers, number of people, water level and who is vulnerable (pregnant, needs medical care, baby, elderly, cannot walk). They work offline. Gemini then re-reads each message to catch what rules miss, like landmarks ("near Phoenix mall" is Velachery) or "old couple" meaning two people — on the device with Gemini Nano when Chrome has it, in the cloud otherwise (see below).
 - **Checks the AI.** Anything Gemini returns that isn't in the original message — a phone number, an unknown area, an address nobody wrote — is not used, and the request shows what was dropped.
 - **Groups repeats.** Messages with the same phone number, or the same door number and street in the same area, become one request. It says why they were grouped.
 - **Orders by urgency, with points you can see.** Pregnant or in labour +40, medical +40, neck-deep water +35, baby +25, elderly +20, cannot walk +20, on a terrace +20, plus time waiting and number of reports.
@@ -35,6 +35,18 @@ This has been tried before: in the 2018 Kerala floods, volunteers built keralare
 | Request details | Results page | Phone |
 |---|---|---|
 | ![Request](docs/screenshots/request.jpg) | ![Results](docs/screenshots/results.jpg) | ![Phone](docs/screenshots/phone.jpg) |
+
+## Works when the network doesn't
+
+Floods take out mobile data first. FloodLine is built for that:
+
+- **The app works offline.** After one visit, a service worker keeps the page, its libraries and the map tiles already seen on the device. With no signal, volunteers can still paste messages, see the board, take and close requests.
+- **Hybrid AI with Firebase AI Logic.** Messages are read by **Gemini Nano on the device** when Chrome has it (no internet needed, and the messages never leave the phone or laptop), and by **Gemini in the cloud** when it doesn't. Each request says which one read it. Settings lets a group choose: on-device first (default), on-device only, cloud only, or rules only.
+- **Rules always run.** If there is no network and no on-device model, the rule reader still fills the board, so nothing waits on AI.
+- **The same checks apply to both.** Whatever Gemini returns — on the device or in the cloud — goes through FloodLine's checks before it reaches the board.
+- **The cloud side is locked to this site.** Firebase App Check (reCAPTCHA Enterprise) means only FloodLine's own pages can use the project. There is no API key to paste and none in the repo; the Firebase config in `js/firebase-config.js` is a public identifier. If a cloud model is busy or out of free quota, the next one is tried (Gemini 3.6 Flash → 3.5 Flash → 3.1 Flash-Lite).
+
+On-device reading needs desktop Chrome 139 or later with the Gemini Nano model; press "Prepare" in Settings once to download it.
 
 ## Does it help?
 
@@ -57,7 +69,7 @@ How well it reads messages:
 
 - On the 269 generated messages, rules get every field right. That is easy for them, because the generator uses phrasings the rules know.
 - On 30 messages I wrote and labelled by hand to look like real ones (landmarks, Tamil number words, typos), and did not tune the rules on, rules get 90.3% of fields right — but only 37.5% of head counts.
-- On the same 30 messages, Gemini (gemini-3.6-flash, run on November 14, 2026) with FloodLine's checks gets **98.6%** of fields right, and **100%** of head counts ("old couple", "my amma alone", Tamil "மூன்று பேர்"). Its two mistakes: it placed an Adyar river advisory in Kotturpuram (the bridge it mentions), and it marked a woman in labour as needing medical care as well as pregnant. Nothing it returned had to be blocked on this run. You can repeat the test on the Results page with your own key.
+- On the same 30 messages, Gemini (gemini-3.6-flash, run on November 14, 2026) with FloodLine's checks gets **98.6%** of fields right, and **100%** of head counts ("old couple", "my amma alone", Tamil "மூன்று பேர்"). Its two mistakes: it placed an Adyar river advisory in Kotturpuram (the bridge it mentions), and it marked a woman in labour as needing medical care as well as pregnant. Nothing it returned had to be blocked on this run. You can repeat the test on the Results page, in the cloud or with Gemini Nano on your own device.
 - Grouping repeats on the generated night: 230 request messages became 110 households, which is the true number.
 
 These are simulations. They show what better coordination can do under the stated assumptions, not what happened in a real flood.
@@ -75,10 +87,10 @@ No build step and no server.
 
 ```bash
 python -m http.server 8000      # then open http://localhost:8000
-node --test test/core.test.mjs  # 17 unit tests
+node --test test/core.test.mjs  # 18 unit tests
 ```
 
-Gemini is optional: Settings → paste a key from https://aistudio.google.com/apikey. The key stays in the browser.
+Cloud AI on localhost uses the same Firebase project (localhost is allowed in its App Check key). To use your own project, put its web config in `js/firebase-config.js`, turn on Firebase AI Logic with the Gemini Developer API, and register a reCAPTCHA Enterprise key in App Check.
 
 ## Code
 
@@ -90,7 +102,9 @@ js/core/priority.js   points and their reasons
 js/core/store.js      event log → current board (status, warnings)
 js/core/sim.js        simulated night and the today-vs-FloodLine comparison
 js/core/hardset.js    the 30 hand-labelled test messages
-js/app.js, bench.js, map.js, gemini.js   the page
+js/ai.js              hybrid AI: Gemini Nano on the device, Gemini in the cloud (Firebase AI Logic)
+sw.js                 offline copy of the app
+js/app.js, bench.js, map.js   the page
 ```
 
 Everything in `js/core/` is plain functions with unit tests. More detail: [docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md).
