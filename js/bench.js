@@ -18,7 +18,7 @@ const METRICS = [
 // Last recorded Gemini run on the hand-labelled set (README has the details).
 const MEASURED = {
   cloud: { date: '14 November 2026', model: 'Gemini 3.6 Flash (cloud)', overall: 98.6, fields: { kind: 100, area: 96.7, phones: 100, people: 100, vulnerable: 95.7, water: 100 } },
-  device: null, // filled in once measured with Gemini Nano on a real device
+  device: { date: '18 November 2026', model: 'Gemini Nano in Chrome 157 on a laptop (RTX 4050), no internet', overall: 88.3, fields: { kind: 90, area: 96.7, phones: 100, people: 68.8, vulnerable: 87, water: 78.3 } },
 };
 
 const show = (v, time) => (v == null ? '—' : time ? fmtMinutes(v) : String(v));

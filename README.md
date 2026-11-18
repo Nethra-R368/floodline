@@ -70,6 +70,7 @@ How well it reads messages:
 - On the 269 generated messages, rules get every field right. That is easy for them, because the generator uses phrasings the rules know.
 - On 30 messages I wrote and labelled by hand to look like real ones (landmarks, Tamil number words, typos), and did not tune the rules on, rules get 90.3% of fields right — but only 37.5% of head counts.
 - On the same 30 messages, Gemini (gemini-3.6-flash, run on November 14, 2026) with FloodLine's checks gets **98.6%** of fields right, and **100%** of head counts ("old couple", "my amma alone", Tamil "மூன்று பேர்"). Its two mistakes: it placed an Adyar river advisory in Kotturpuram (the bridge it mentions), and it marked a woman in labour as needing medical care as well as pregnant. Nothing it returned had to be blocked on this run. You can repeat the test on the Results page, in the cloud or with Gemini Nano on your own device.
+- On the same 30 messages, **Gemini Nano on the device** (Chrome 157 on a laptop, no internet, run on November 18, 2026) with FloodLine's checks gets **88.3%** of fields right: area 96.7%, phones 100%, head counts 68.8% (rules alone: 37.5%), vulnerable 87%, water level 78.3%, message type 90%. It is weaker than cloud Gemini, so FloodLine treats it as a small model: on the device, Gemini Nano only fills gaps for water level and vulnerable people (fields the rules already read well) and is trusted for area, head counts and message type. I chose that policy after a first on-device run on this same set scored 84.8%, when Nano was overriding correct water levels and adding vulnerable flags nobody wrote; so the 88.3% is not a held-out number. Five details Nano returned on this run were not in the messages and were dropped by the checks.
 - Grouping repeats on the generated night: 230 request messages became 110 households, which is the true number.
 
 These are simulations. They show what better coordination can do under the stated assumptions, not what happened in a real flood.
@@ -87,7 +88,7 @@ No build step and no server.
 
 ```bash
 python -m http.server 8000      # then open http://localhost:8000
-node --test test/core.test.mjs  # 18 unit tests
+node --test test/core.test.mjs  # 19 unit tests
 ```
 
 Cloud AI on localhost uses the same Firebase project (localhost is allowed in its App Check key). To use your own project, put its web config in `js/firebase-config.js`, turn on Firebase AI Logic with the Gemini Developer API, and register a reCAPTCHA Enterprise key in App Check.
