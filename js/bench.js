@@ -24,7 +24,7 @@ const MEASURED = {
 
 // Last recorded runs on the 60 real 2015 messages (null = not measured yet).
 const MEASURED_REAL = {
-  cloud: { date: '18 November 2026', model: 'Gemini 3.6 Flash via Firebase AI Logic', overall: 94.7, fields: { kind: 91.7, area: 100, phones: 97.6, people: 90, vulnerable: 95.2, water: 95.2 } },
+  cloud: { date: '18 November 2026', model: 'Gemini in the cloud via Firebase AI Logic (3.6 Flash, falling back to lighter models when busy)', overall: 94.7, fields: { kind: 91.7, area: 100, phones: 97.6, people: 90, vulnerable: 95.2, water: 95.2 } },
   device: { date: '18 November 2026', model: 'Gemini Nano in Chrome 157, on the laptop', overall: 78.1, fields: { kind: 63.3, area: 72.7, phones: 97.6, people: 70, vulnerable: 85.7, water: 78.6 } },
 };
 
