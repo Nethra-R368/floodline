@@ -58,6 +58,9 @@ A rescue board is fed from public, unverified posts and holds families' phone nu
 - **Encrypted shift handover.** The board file a shift hands to the next can be locked with a passphrase: AES-256-GCM, key derived with PBKDF2-SHA-256 (310,000 rounds), random salt and IV. A wrong passphrase, or a single changed byte, is refused.
 - **Tamper-evident board fingerprint.** Every message and action is folded into a SHA-256 hash chain; its head is shown as a short fingerprint (e.g. `57E8-B548-7836`). Two volunteers who read out the same fingerprint have identical boards. Files carry the fingerprint and are checked on load.
 - **Privacy mode.** One switch masks every phone number on screen (`98•••••345`) for screen-sharing or photos of the board; the call and WhatsApp buttons still work.
+- **One board across phones, end-to-end encrypted.** Volunteers who enter the same group code share one live board through Firestore. Each message and action is encrypted on the device (AES-256-GCM, key from the code with PBKDF2-SHA-256, 310,000 rounds) before it is sent, so Firestore holds only ciphertext; the board's id is a SHA-256 of the code. [`firestore.rules`](firestore.rules) make the log append-only and accept writes only from signed-in (anonymous) volunteers, stamped with the server time. Offline changes are queued and sent when the network returns.
+- **Content Security Policy and Subresource Integrity.** The page may only load code from itself, the pinned map library and Firebase; the map library is checked with SHA-384 integrity hashes. All message text is escaped before display (tested with an injected `<img onerror>`).
+- **Prompt injection.** The model fills a fixed schema for one message at a time and can't act; its answer is checked against the message (tested with an "ignore your instructions" post).
 - **No secrets in the client.** No API keys in the code or the repo; the cloud model is reachable only from this site through Firebase App Check.
 
 
@@ -77,6 +80,18 @@ Averages over 20 simulated nights, 110 households each:
 | Median wait, everyone who was reached | 2h 42m | 2h 47m | 9 / 11 |
 
 The median waits are slightly longer with FloodLine. Two reasons: the medians only count households that were reached, and today's way never reaches about 27 of them; and FloodLine sends boats to critical households first, so lower-risk ones wait longer.
+
+### The real flood test: 520 real posts, replayed
+
+The **Real flood test** tab and the **Real replay: Chennai, 2 Dec 2015** board play every rescue-related post with a phone number from the archive below — **520 real posts** from 19:43 on 2 December to 12:30 on 3 December 2015 — in the order and at the minute they were posted, anonymised (`js/core/realstream.js`). Read by Gemini in the cloud through Firebase AI Logic and checked by FloodLine (recorded in `js/core/realstream_ai.js`):
+
+- **231 households** needing help; **97 posts** were reposts of a family already on the board (a pregnant woman in Mudichur was posted 12 times, another in Velachery 8 times).
+- **138 helpline / offer posts** kept off the request list, so boats aren't sent to a helpline number.
+- **65 critical households** at the top: 18 pregnant or in labour, 23 with a baby, 12 needing medical care.
+- **103 details** Gemini returned that the posts never said were dropped by the checks.
+- At 22:00 on 2 December a volunteer would already have had 95 households from 162 posts, 30 of them critical, in order.
+
+The archive has the posts, not what happened next: this shows what FloodLine would have put in front of volunteers and in what order, not where boats actually went.
 
 ### Tested on real messages from the 2015 Chennai floods
 
@@ -109,7 +124,7 @@ These are simulations. They show what better coordination can do under the state
 
 ## Limits
 
-- Different phones can't share a board yet; that needs a small server.
+- Shared boards use a group code and anonymous sign-in; there are no individual accounts or roles yet.
 - It knows 28 flood-prone Chennai localities; on real 2015 messages only 22 of 60 named one of them. Pins are at the locality, not the house.
 - It reads text only, not voice notes or photos.
 - It has not been used in a real flood.
@@ -120,7 +135,7 @@ No build step and no server.
 
 ```bash
 python -m http.server 8000      # then open http://localhost:8000
-node --test test/core.test.mjs  # 25 unit tests
+node --test test/core.test.mjs  # 28 unit tests
 ```
 
 Cloud AI on localhost uses the same Firebase project (localhost is allowed in its App Check key). To use your own project, put its web config in `js/firebase-config.js`, turn on Firebase AI Logic with the Gemini Developer API, and register a reCAPTCHA Enterprise key in App Check.
@@ -137,6 +152,9 @@ js/core/sim.js        simulated night and the today-vs-FloodLine comparison
 js/core/hardset.js    the 30 hand-labelled test messages
 js/core/security.js   scam / phishing check, privacy masking, hash-chain fingerprint, AES-256-GCM handover
 js/core/realset.js    60 real, anonymised 2015 messages, hand-labelled
+js/core/realstream.js 520 real, anonymised 2015 posts with their times; realstream_ai.js = Gemini's reading
+js/sync.js            shared board: Firestore + Auth, events AES-256-GCM encrypted on the device
+js/case.js            the Real flood test page
 js/ai.js              hybrid AI: Gemini Nano on the device, Gemini in the cloud (Firebase AI Logic)
 sw.js                 offline copy of the app
 js/app.js, bench.js, map.js   the page
