@@ -6,7 +6,9 @@ import { buildExtractPrompt, parseExtractReply, EXTRACT_SCHEMA } from './core/pr
 
 const FB = 'https://www.gstatic.com/firebasejs/13.1.0/';
 const MODE_NAME = { auto: 'PREFER_ON_DEVICE', device: 'ONLY_ON_DEVICE', cloud: 'ONLY_IN_CLOUD' };
-const BATCH = { device: 5, cloud: 10 };
+// Tried in order; a model that is busy (500/503) hands over to the next one.
+const CLOUD_MODELS = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.1-flash-lite'];
+const BATCH ={ device: 5, cloud: 10 };
 const LM_OPTIONS = { expectedInputs: [{ type: 'text', languages: ['en'] }], expectedOutputs: [{ type: 'text', languages: ['en'] }] };
 
 let sdk = null;
@@ -25,9 +27,8 @@ async function load() {
       ]);
       const app = appMod.initializeApp(FIREBASE_CONFIG);
       try {
-        if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
         if (RECAPTCHA_SITE_KEY) {
-          checkMod.initializeAppCheck(app, { provider: new checkMod.ReCaptchaV3Provider(RECAPTCHA_SITE_KEY), isTokenAutoRefreshEnabled: true });
+          checkMod.initializeAppCheck(app, { provider: new checkMod.ReCaptchaEnterpriseProvider(RECAPTCHA_SITE_KEY), isTokenAutoRefreshEnabled: true });
         }
       } catch (err) {
         console.warn('App Check could not start (offline?). On-device reading still works.', err);
@@ -40,20 +41,38 @@ async function load() {
   return loading;
 }
 
-function getModel(mode) {
-  if (!models[mode]) {
-    models[mode] = sdk.getGenerativeModel(ai, {
+function getModel(mode, cloudModel = CLOUD_MODELS[0]) {
+  const key = `${mode}|${cloudModel}`;
+  if (!models[key]) {
+    models[key] = sdk.getGenerativeModel(ai, {
       mode: sdk.InferenceMode[MODE_NAME[mode]],
       inCloudParams: {
+        model: cloudModel,
         generationConfig: { responseMimeType: 'application/json', responseSchema: EXTRACT_SCHEMA, temperature: 0.1 },
       },
       onDeviceParams: {
         createOptions: LM_OPTIONS,
         promptOptions: { responseConstraint: EXTRACT_SCHEMA },
       },
-    });
+    }, { timeout: 30000 });
   }
-  return models[mode];
+  return models[key];
+}
+
+// Busy, timed out or out of free quota: each model has its own quota, so try the next one.
+const BUSY = /\b(429|500|503)\b|quota|resource.?exhausted|high demand|overloaded|unavailable|internal|time.?out|expired|abort/i;
+
+async function generate(mode, prompt) {
+  let last;
+  for (const name of CLOUD_MODELS) {
+    try {
+      return await getModel(mode, name).generateContent(prompt);
+    } catch (err) {
+      last = err;
+      if (mode === 'device' || !BUSY.test(String(err && err.message || err))) throw err;
+    }
+  }
+  throw last;
 }
 
 /** 'available' | 'downloadable' | 'downloading' | 'unavailable' | 'unsupported' (no built-in AI in this browser) */
@@ -76,7 +95,6 @@ export async function prepareDevice(onProgress = () => {}) {
 export async function readMessages(texts, mode = 'auto', onProgress = () => {}) {
   if (!isConfigured()) throw new Error('AI is not set up yet; messages were read by rules.');
   await load();
-  const model = getModel(mode);
   const onDevice = mode === 'device' || (mode === 'auto' && (await deviceStatus()) === 'available');
   const size = onDevice ? BATCH.device : BATCH.cloud;
   const xs = [];
@@ -85,7 +103,7 @@ export async function readMessages(texts, mode = 'auto', onProgress = () => {}) 
     const chunk = texts.slice(i, i + size);
     let result;
     try {
-      result = await model.generateContent(buildExtractPrompt(chunk));
+      result = await generate(mode, buildExtractPrompt(chunk));
     } catch (err) {
       const msg = String(err && err.message || err);
       if (!navigator.onLine) throw new Error('No internet and no on-device model, so messages were read by rules. They will still be on the board.');
@@ -93,7 +111,7 @@ export async function readMessages(texts, mode = 'auto', onProgress = () => {}) 
       if (/app.?check|attestation|403/i.test(msg)) throw new Error('The cloud AI refused this site (App Check). On-device reading still works.');
       throw new Error(`AI could not read these messages: ${msg.slice(0, 140)}`);
     }
-    const src = result.response.inferenceSource === 'ON_DEVICE' ? 'device' : 'cloud';
+    const src = /on_device/i.test(result.response.inferenceSource || '') ? 'device' : 'cloud';
     const part = parseExtractReply(result.response.text(), chunk).map((x) => ({ ...x, where: src }));
     where[src] += part.length;
     xs.push(...part);

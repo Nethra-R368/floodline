@@ -1,8 +1,8 @@
 // Keeps FloodLine usable with no internet: after one visit, the app, its libraries, fonts and
 // any map tiles already seen are served from the device. AI calls to the cloud are never cached.
-const CACHE = 'floodline-v2';
+const CACHE = 'floodline-v3';
 const SHELL = [
-  './', 'index.html', 'manifest.webmanifest', 'css/style.css',
+  './', 'index.html', 'manifest.webmanifest', 'css/style.css', 'icon.svg',
   'js/app.js', 'js/bench.js', 'js/map.js', 'js/util.js', 'js/ai.js', 'js/firebase-config.js',
   'js/core/dedupe.js', 'js/core/extract.js', 'js/core/gazetteer.js', 'js/core/hardset.js', 'js/core/input.js',
   'js/core/priority.js', 'js/core/prompt.js', 'js/core/sim.js', 'js/core/store.js',
@@ -10,7 +10,10 @@ const SHELL = [
 const CACHEABLE_HOSTS = ['cdnjs.cloudflare.com', 'www.gstatic.com', 'fonts.googleapis.com', 'fonts.gstatic.com', 'tile.openstreetmap.org'];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  // cache: 'reload' skips the browser's HTTP cache, so a new version never precaches old files.
+  e.waitUntil(caches.open(CACHE)
+    .then((c) => c.addAll(SHELL.map((u) => new Request(u, { cache: 'reload' }))))
+    .then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (e) => {
@@ -24,13 +27,24 @@ self.addEventListener('fetch', (e) => {
   const sameOrigin = url.origin === self.location.origin;
   const cdn = CACHEABLE_HOSTS.some((h) => url.hostname === h || url.hostname.endsWith(`.${h}`));
   if (!sameOrigin && !cdn) return; // AI, App Check, reCAPTCHA: always live network
-  // Stale-while-revalidate: answer from the device at once, refresh the copy in the background.
+
   e.respondWith(caches.open(CACHE).then(async (cache) => {
-    const hit = await cache.match(req, { ignoreSearch: sameOrigin });
-    const fresh = fetch(req).then((res) => {
-      if (res && (res.ok || res.type === 'opaque')) cache.put(req, res.clone());
-      return res;
-    }).catch(() => hit || (req.mode === 'navigate' ? cache.match('index.html') : Response.error()));
-    return hit || fresh;
+    if (sameOrigin) {
+      // FloodLine's own files: newest from the network when online, the saved copy when offline.
+      try {
+        const res = await fetch(req, { cache: 'no-cache' });
+        if (res.ok) cache.put(req, res.clone());
+        return res;
+      } catch {
+        return (await cache.match(req, { ignoreSearch: true }))
+          || (req.mode === 'navigate' ? cache.match('index.html') : Response.error());
+      }
+    }
+    // Libraries, fonts and map tiles have fixed URLs: the saved copy first, the network otherwise.
+    const hit = await cache.match(req);
+    if (hit) return hit;
+    const res = await fetch(req);
+    if (res && (res.ok || res.type === 'opaque')) cache.put(req, res.clone());
+    return res;
   }));
 });

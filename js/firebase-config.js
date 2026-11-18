@@ -1,16 +1,13 @@
-// Firebase web config for FloodLine. These values are public by design (they identify the
-// project, they are not secrets); access is protected by App Check (reCAPTCHA v3) and by the
-// allowed domains set in the Firebase and Google Cloud consoles.
-// Until the placeholders are replaced, FloodLine reads messages with rules only.
-
+// Firebase web app config. These values identify the project; they are not secrets.
+// Access is protected by Firebase App Check (reCAPTCHA Enterprise), so other sites cannot use them.
 export const FIREBASE_CONFIG = {
-  apiKey: 'YOUR_API_KEY',
-  authDomain: 'YOUR_PROJECT.firebaseapp.com',
-  projectId: 'YOUR_PROJECT',
-  storageBucket: 'YOUR_PROJECT.firebasestorage.app',
-  messagingSenderId: 'YOUR_SENDER_ID',
-  appId: 'YOUR_APP_ID',
+  apiKey: 'AIzaSyDpLIy_o34ZV-EJipp-m0oj4A5K_1eq61I',
+  authDomain: 'floodline-bad3b.firebaseapp.com',
+  projectId: 'floodline-bad3b',
+  storageBucket: 'floodline-bad3b.firebasestorage.app',
+  messagingSenderId: '480380018469',
+  appId: '1:480380018469:web:04bf503939bfdd634584cc',
 };
 
-// reCAPTCHA v3 site key registered for App Check (public). On localhost a debug token is used instead.
-export const RECAPTCHA_SITE_KEY = '';
+// reCAPTCHA Enterprise (Fraud Defense) site key for App Check. Public; allowed on nethra-r368.github.io and localhost.
+export const RECAPTCHA_SITE_KEY = '6LcWXiYuAAAAAMCzjhz9YdEzaeVDVFPPBqbO2byx';
