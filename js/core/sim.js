@@ -129,7 +129,7 @@ const OFFERS = [
  */
 export function generateNight({ seed = 2023, households = 110, hours = 8, noiseRate = 0.12 } = {}) {
   const r = rng(seed);
-  const areaPairs = AREAS.map((a) => [a, AREA_WEIGHT[a.id] || 2]);
+  const areaPairs = AREAS.filter((a) => !a.extra).map((a) => [a, AREA_WEIGHT[a.id] || 2]);
   const usedPhones = new Set();
   const newPhone = () => {
     let p;

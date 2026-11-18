@@ -4,6 +4,7 @@ import { fmtMinutes } from './core/priority.js';
 import { generateNight, tripMinutes } from './core/sim.js';
 import { splitMessages } from './core/input.js';
 import { HARD_SET } from './core/hardset.js';
+import { REAL_STREAM } from './core/realstream.js';
 import { isConfigured, deviceStatus, prepareDevice, readMessages } from './ai.js';
 import { createMap } from './map.js';
 import { initBench } from './bench.js';
@@ -12,7 +13,11 @@ import { scamCheck, maskPhone, maskText, chainHead, fingerprint, sealBoard, open
 
 const SEED = 2023;
 const DEMO_START = 20 * 60; // the simulated night starts at 20:00
-const NIGHT_END = 720;
+const NIGHT_END_DEMO = 720;
+const REPLAY_START = 19 * 60 + 30; // the 2015 replay starts at 19:30 IST on 2 December
+const NIGHT_END_2015 = Math.ceil(REAL_STREAM[REAL_STREAM.length - 1].at) + 10;
+const isReplay = () => ws === 'demo' || ws === 'r2015';
+const endOf = () => (ws === 'r2015' ? NIGHT_END_2015 : NIGHT_END_DEMO);
 const BOATS = 10;
 const TAB = Math.random().toString(36).slice(2, 8);
 
@@ -29,7 +34,7 @@ const els = {
 };
 
 // ---------------- workspace (event log + replay state), persisted per browser ----------------
-let ws = store.get('floodline.workspace') === 'live' ? 'live' : 'demo';
+let ws = ['live', 'r2015'].includes(store.get('floodline.workspace')) ? store.get('floodline.workspace') : 'demo';
 let W = loadWorkspace(ws);
 let state = null;
 let filter = 'action';
@@ -54,12 +59,15 @@ function saveWorkspace() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => store.set(`floodline.ws.${ws}`, JSON.stringify(W)), 300);
 }
-const nowMin = () => (ws === 'demo' ? W.clock : Date.now() / 60000);
-const getNight = () => (night ||= generateNight({ seed: SEED }));
+const nowMin = () => (isReplay() ? W.clock : Date.now() / 60000);
+let night2015 = null;
+const getNight = () => (ws === 'r2015'
+  ? (night2015 ||= { messages: REAL_STREAM.map((m, i) => ({ id: `R${i}`, at: m.at, text: m.text })) })
+  : (night ||= generateNight({ seed: SEED })));
 
 function fmtClock(min) {
-  if (ws === 'demo') {
-    const t = Math.floor(DEMO_START + min) % 1440;
+  if (isReplay()) {
+    const t = Math.floor((ws === 'r2015' ? REPLAY_START : DEMO_START) + min) % 1440;
     return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
   }
   return new Date(min * 60000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -102,28 +110,28 @@ function addEvents(evs) {
 // ---------------- replay of the simulated night ----------------
 function setPlaying(on) {
   if (on && !timer) {
-    if (W.clock >= NIGHT_END) { toast('The practice night is over. Press Reset to run it again.'); return; }
+    if (W.clock >= endOf()) { toast('The practice night is over. Press Reset to run it again.'); return; }
     timer = setInterval(tick, 250);
   } else if (!on && timer) {
     clearInterval(timer);
     timer = null;
   }
-  els.play.textContent = timer ? 'Pause' : W.clock >= NIGHT_END ? 'Night finished' : W.clock > 0 ? 'Resume' : 'Start the night';
+  els.play.textContent = timer ? 'Pause' : W.clock >= endOf() ? 'Night finished' : W.clock > 0 ? 'Resume' : ws === 'r2015' ? 'Play the real night' : 'Start the night';
 }
 
 function tick() {
-  W.clock = Math.min(NIGHT_END, W.clock + Number(els.speed.value) / 4);
+  W.clock = Math.min(endOf(), W.clock + Number(els.speed.value) / 4);
   const msgs = getNight().messages;
   const evs = [];
   while (W.cursor < msgs.length && msgs[W.cursor].at <= W.clock) {
     const m = msgs[W.cursor++];
-    evs.push({ t: 'report', id: `d${m.id}`, at: m.at, text: m.text, source: 'WhatsApp group (simulated)', x: extractRules(m.text) });
+    evs.push({ t: 'report', id: `d${m.id}`, at: m.at, text: m.text, source: ws === 'r2015' ? 'X (Twitter), 2 Dec 2015 · real, anonymised' : 'WhatsApp group (simulated)', x: extractRules(m.text) });
   }
   if (evs.length) { W.events.push(...evs); send({ type: 'events', events: evs }); }
   if (els.autoBoats.checked) runBoats();
   send({ type: 'clock', clock: W.clock, cursor: W.cursor });
   saveWorkspace();
-  if (W.clock >= NIGHT_END) { setPlaying(false); toast('The practice night is over. The Results page compares it with manual coordination.'); }
+  if (W.clock >= endOf()) { setPlaying(false); toast(ws === 'r2015' ? 'That was every rescue post in the archive, up to 12:30 on 3 December 2015.' : 'The practice night is over. The Results page compares it with manual coordination.'); }
   scheduleRender();
 }
 
@@ -291,7 +299,7 @@ function render() {
   state = buildState(W.events, now);
   const s = state.stats;
   els.clock.textContent = fmtClock(now);
-  els.clockLabel.textContent = ws === 'demo' ? `practice night, ${Math.round((W.clock / NIGHT_END) * 100)}% through` : 'live';
+  els.clockLabel.textContent = ws === 'demo' ? `practice night, ${Math.round((W.clock / endOf()) * 100)}% through` : ws === 'r2015' ? `${W.clock >= 270 ? '3' : '2'} Dec 2015 · real replay, ${W.cursor} of ${REAL_STREAM.length} posts` : 'live';
   const part = (n, label, alert) => `<span class="${alert && n ? 'alert' : ''}"><b>${n}</b> ${label}</span>`;
   els.stats.innerHTML = s.messages
     ? [part(s.unassigned, 'unassigned', true), part(s.critical, 'critical still open', true), part(s.stale, 'with no one on them for 45+ min', true), part(s.rescued, 'rescued'),
@@ -581,8 +589,10 @@ function switchWorkspace(name) {
   seenCases.clear();
   firstRender = true;
   els.workspace.value = ws;
-  els.replayCtl.classList.toggle('hidden', ws !== 'demo');
+  els.replayCtl.classList.toggle('hidden', !isReplay());
   $('practiceBanner').classList.toggle('hidden', ws !== 'demo');
+  $('replayBanner').classList.toggle('hidden', ws !== 'r2015');
+  els.autoBoats.checked = ws !== 'r2015';
   openChannel();
   setPlaying(false);
   render();
@@ -612,5 +622,5 @@ const mapApi = createMap($('map'), (id) => openDrawer(id));
 const bench = initBench({ getAi: () => ai });
 updateMe();
 switchWorkspace(ws);
-if (ws === 'demo' && W.clock > 0 && W.clock < NIGHT_END) els.play.textContent = '▶ Resume';
+if (isReplay() && W.clock > 0 && W.clock < endOf()) els.play.textContent = '▶ Resume';
 window.addEventListener('beforeunload', () => store.set(`floodline.ws.${ws}`, JSON.stringify(W)));

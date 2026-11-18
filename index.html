@@ -20,6 +20,10 @@
     <b>Practice mode</b> — a simulated flood night for training and demos. Every name and phone number here is made up.
     <button type="button" id="goLive" class="linklike">Switch to live board</button>
   </div>
+  <div id="replayBanner" class="practice real hidden">
+    <b>Real flood replay · Chennai, 2–3 December 2015</b> — <span id="replayCount">520</span> real rescue-related posts from that night arrive at the minute they were posted, and FloodLine reads them as they come. Wording as people wrote it; every name and number changed. Boats are not simulated unless you turn them on.
+    <button type="button" id="replayStory" class="linklike">What it found</button>
+  </div>
 
   <header class="mast">
     <a class="ident" href="#" aria-label="FloodLine home">
@@ -36,6 +40,7 @@
         <select id="workspace">
           <option value="demo">Practice board</option>
           <option value="live">Live board</option>
+          <option value="r2015">Real replay: Chennai, 2 Dec 2015</option>
         </select>
       </label>
       <span id="netState" class="presence hidden" style="color:var(--red);font-weight:600">Offline — still working</span>
