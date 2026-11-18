@@ -23,7 +23,10 @@ const MEASURED = {
 };
 
 // Last recorded runs on the 60 real 2015 messages (null = not measured yet).
-const MEASURED_REAL = { cloud: null, device: null };
+const MEASURED_REAL = {
+  cloud: null,
+  device: { date: '18 November 2026', model: 'Gemini Nano in Chrome 157, on the laptop', overall: 77.7, fields: { kind: 63.3, area: 69.6, phones: 97.6, people: 70, vulnerable: 85.7, water: 78.6 } },
+};
 
 const show = (v, time) => (v == null ? '—' : time ? fmtMinutes(v) : String(v));
 

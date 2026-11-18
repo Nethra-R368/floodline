@@ -510,6 +510,7 @@ privacyBox.addEventListener('change', () => {
   render();
 });
 
+const handoverSay = (msg, bad) => { const el = $('handoverStatus'); el.textContent = msg; el.style.color = bad ? 'var(--red)' : 'var(--green)'; el.style.fontWeight = '600'; toast(msg); };
 function download(name, obj) {
   const blob = new Blob([JSON.stringify(obj, null, 1)], { type: 'application/json' });
   const a = document.createElement('a');
@@ -526,13 +527,13 @@ els.exportBtn.addEventListener('click', async () => {
     if (pass) {
       const sealed = await sealBoard(board, pass);
       download(`floodline-${ws}-${stamp}.locked.json`, sealed);
-      toast(`Locked with AES-256-GCM. Fingerprint ${sealed.fingerprint}. Tell the next shift the passphrase by voice, not in the group.`);
+      handoverSay(`🔒 Locked with AES-256-GCM. Fingerprint ${sealed.fingerprint}. Tell the next shift the passphrase by voice, not in the group.`);
     } else {
       const head = await chainHead(board.events);
       download(`floodline-${ws}-${stamp}.json`, { ...board, chainHead: head });
-      toast(`Downloaded, not locked. Fingerprint ${fingerprint(head)}.`);
+      handoverSay(`Downloaded, not locked. Fingerprint ${fingerprint(head)}.`);
     }
-  } catch (err) { toast(err.message); }
+  } catch (err) { handoverSay(err.message, true); }
 });
 els.importFile.addEventListener('change', async () => {
   const f = els.importFile.files[0];
@@ -554,10 +555,10 @@ els.importFile.addEventListener('change', async () => {
     W.events = mergeEvents(W.events, evs);
     saveWorkspace();
     send({ type: 'events', events: evs });
-    toast(`Imported ${evs.length} events.${note}`);
-    els.settingsDialog.close();
+    handoverSay(`✓ Imported ${evs.length} events.${note}`);
+    setTimeout(() => els.settingsDialog.close(), 2500);
     render();
-  } catch (err) { toast(err && err.message && !/JSON/.test(err.message) ? err.message : 'That file is not a FloodLine board'); }
+  } catch (err) { handoverSay(`✗ ${err && err.message && !/JSON/.test(err.message) ? err.message : 'That file is not a FloodLine board'}`, true); }
   els.importFile.value = '';
 });
 

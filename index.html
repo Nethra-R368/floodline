@@ -215,6 +215,7 @@
         <input id="handoverPass" type="password" autocomplete="new-password" minlength="8" placeholder="at least 8 characters — leave empty for an unlocked file" />
       </label>
       <div class="row"><button id="exportBtn" class="btn" type="button">Download board</button><label class="btn">Load a board file<input id="importFile" type="file" accept="application/json,.floodline" hidden /></label></div>
+      <p id="handoverStatus" class="note" role="status" aria-live="polite"></p>
       <p class="note">Board fingerprint: <b id="fpFull" class="mono">…</b> — a SHA-256 hash chain over every message and action. If two volunteers read out the same fingerprint, their boards are identical; any edit changes it.</p>
       <hr />
       <h3>Privacy</h3>
