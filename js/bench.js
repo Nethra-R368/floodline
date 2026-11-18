@@ -2,6 +2,7 @@ import { generateNight, simulate, evaluateExtraction, evaluateDedupe, DEFAULT_SI
 import { extractRules } from './core/extract.js';
 import { HARD_SET, scoreHardSet } from './core/hardset.js';
 import { REAL_SET } from './core/realset.js';
+import { MEASURED_REAL } from './core/measured.js';
 import { fmtMinutes } from './core/priority.js';
 import { isConfigured, readMessages } from './ai.js';
 import { $, esc } from './util.js';
@@ -22,11 +23,7 @@ const MEASURED = {
   device: { date: '18 November 2026', model: 'Gemini Nano in Chrome 157 on a laptop (RTX 4050), no internet', overall: 88.3, fields: { kind: 90, area: 96.7, phones: 100, people: 68.8, vulnerable: 87, water: 78.3 } },
 };
 
-// Last recorded runs on the 60 real 2015 messages (null = not measured yet).
-const MEASURED_REAL = {
-  cloud: { date: '18 November 2026', model: 'Gemini in the cloud via Firebase AI Logic (3.6 Flash, falling back to lighter models when busy)', overall: 94.7, fields: { kind: 91.7, area: 100, phones: 97.6, people: 90, vulnerable: 95.2, water: 95.2 } },
-  device: { date: '18 November 2026', model: 'Gemini Nano in Chrome 157, on the laptop', overall: 78.1, fields: { kind: 63.3, area: 72.7, phones: 97.6, people: 70, vulnerable: 85.7, water: 78.6 } },
-};
+// Last recorded runs on the 60 real 2015 messages live in core/measured.js.
 
 const show = (v, time) => (v == null ? '—' : time ? fmtMinutes(v) : String(v));
 

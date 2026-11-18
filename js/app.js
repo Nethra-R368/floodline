@@ -604,9 +604,10 @@ setInterval(() => { if (ws === 'live') scheduleRender(); }, 30000);
 // tabs
 document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => {
   document.querySelectorAll('.tab').forEach((x) => { x.classList.toggle('active', x === t); x.setAttribute('aria-selected', String(x === t)); });
-  for (const v of ['board', 'bench', 'about']) $(`${v}View`).classList.toggle('hidden', v !== t.dataset.view);
+  for (const v of ['board', 'case', 'bench', 'security', 'about']) $(`${v}View`).classList.toggle('hidden', v !== t.dataset.view);
   if (t.dataset.view === 'board') mapApi.resize();
   if (t.dataset.view === 'bench') bench.show();
+  if (t.dataset.view === 'case') import('./case.js').then((m) => m.renderCase($('casePage'))).catch((e) => { $('casePage').textContent = e.message; });
 }));
 
 // mobile column switcher
