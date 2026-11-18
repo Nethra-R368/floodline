@@ -254,3 +254,13 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.4); }
   .cmp { font-size: 0.84rem; }
   .cmp th, .cmp td { padding: 6px 8px; }
 }
+
+/* security & privacy */
+.fp { font-size: 0.78rem; color: var(--muted); }
+.scam { display: inline-block; margin-top: 3px; font-size: 0.75rem; font-weight: 600; color: #fff; background: var(--red); padding: 1px 6px; border-radius: 3px; }
+.scam.check { background: var(--amber); color: #1b1b1b; }
+.scam-box { border: 2px solid var(--red); border-radius: 6px; padding: 8px 10px; margin: 8px 0; }
+.scam-box.check { border-color: var(--amber); }
+.scam-box b { color: var(--red); }
+label.check { display: flex; gap: 8px; align-items: flex-start; font-weight: 400; }
+.privacy .mono.ph { letter-spacing: 0.02em; }

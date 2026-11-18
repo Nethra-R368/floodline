@@ -1,6 +1,7 @@
 import { generateNight, simulate, evaluateExtraction, evaluateDedupe, DEFAULT_SIM } from './core/sim.js';
 import { extractRules } from './core/extract.js';
 import { HARD_SET, scoreHardSet } from './core/hardset.js';
+import { REAL_SET } from './core/realset.js';
 import { fmtMinutes } from './core/priority.js';
 import { isConfigured, readMessages } from './ai.js';
 import { $, esc } from './util.js';
@@ -21,6 +22,9 @@ const MEASURED = {
   device: { date: '18 November 2026', model: 'Gemini Nano in Chrome 157 on a laptop (RTX 4050), no internet', overall: 88.3, fields: { kind: 90, area: 96.7, phones: 100, people: 68.8, vulnerable: 87, water: 78.3 } },
 };
 
+// Last recorded runs on the 60 real 2015 messages (null = not measured yet).
+const MEASURED_REAL = { cloud: null, device: null };
+
 const show = (v, time) => (v == null ? '—' : time ? fmtMinutes(v) : String(v));
 
 function verdict(m, f, time) {
@@ -35,6 +39,7 @@ export function initBench({ getAi }) {
   const out = $('benchResults');
   let ran = false;
   const aiHard = { cloud: null, device: null };
+  const aiReal = { cloud: null, device: null };
 
   function params() {
     const fd = new FormData(form);
@@ -68,6 +73,7 @@ export function initBench({ getAi }) {
       ${METRICS.map((x) => `<tr><td>${x.label}</td><td class="n">${show(m[x.key], x.time)}</td><td class="n">${show(f[x.key], x.time)}</td><td class="n">${verdict(m[x.key], f[x.key], x.time)}</td></tr>`).join('')}
       </tbody></table>${assumptions(p)}`;
     renderAccuracy(night);
+    renderReal();
     ran = true;
   }
 
@@ -114,6 +120,38 @@ export function initBench({ getAi }) {
       <p class="note">${src.misses.length} mistakes out of ${src.checks} checks.</p>
       ${src.misses.slice(0, 14).map((m) => `<div class="miss"><b>${m.field}</b>: should be ${esc(JSON.stringify(m.want))}, got ${esc(JSON.stringify(m.got))}<br><span class="muted">${esc(m.text.slice(0, 130))}</span></div>`).join('')}`;
   }
+
+  function renderReal() {
+    const rules = scoreHardSet(extractRules, REAL_SET);
+    const night = { messages: REAL_SET.map((x, i) => ({ id: `r${i}`, at: i, text: x.text, truth: { kind: x.kind, household: x.household } })) };
+    const dd = evaluateDedupe(night);
+    const fields = [['kind', 'Type of message (request, update, offer, other)'], ['area', 'Area (when it is one of the 28 known localities)'], ['phones', 'Phone numbers'], ['people', 'Number of people'], ['vulnerable', 'Who is vulnerable'], ['water', 'Water level']];
+    const cell = (v) => (v == null ? '—' : `${v}%`);
+    const cloud = aiReal.cloud || MEASURED_REAL.cloud;
+    const device = aiReal.device || MEASURED_REAL.device;
+    const col = (r, k) => (r ? cell(k === 'overall' ? r.overall : r.fields[k]) : '<span class="muted">not measured</span>');
+    const known = REAL_SET.filter((x) => x.areaId).length;
+    $('realAccuracy').innerHTML = `<table class="cmp"><thead><tr><th>Field</th><th>Rules (offline)</th><th>Gemini in the cloud + checks</th><th>Gemini Nano on this device + checks</th></tr></thead><tbody>
+      ${fields.map(([k, label]) => `<tr><td>${label}</td><td class="n">${cell(rules.fields[k])}</td><td class="n">${col(cloud, k)}</td><td class="n">${col(device, k)}</td></tr>`).join('')}
+      <tr><td><b>All fields</b></td><td class="n"><b>${rules.overall}%</b></td><td class="n"><b>${col(cloud, 'overall')}</b></td><td class="n"><b>${col(device, 'overall')}</b></td></tr>
+      </tbody></table>
+      <p class="note">Grouping repeats: ${dd.reports} real request messages were about ${dd.households} households; FloodLine made ${dd.clusters} groups (precision ${dd.precision}%, recall ${dd.recall}%). Only ${known} of the 60 messages name one of FloodLine's 28 localities, so area coverage is the first thing to extend.</p>`;
+  }
+
+  async function runSet(set, store, statusId) {
+    const ai = getAi();
+    const status = $(statusId);
+    if (!isConfigured()) { status.textContent = 'AI reading is not set up on this copy of FloodLine.'; return null; }
+    status.textContent = `Gemini is reading the ${set.length} messages…`;
+    const { xs, where } = await readMessages(set.map((h) => h.text), ai.mode === 'off' ? 'auto' : ai.mode, (d, n, src) => { status.textContent = `Gemini has read ${d} of ${n} (${src === 'device' ? 'on this device' : 'in the cloud'})…`; });
+    store[where.device >= where.cloud ? 'device' : 'cloud'] = scoreHardSet((t, i) => xs[i], set);
+    const blocked = xs.reduce((s, x) => s + (x.guard || []).filter((g) => /Blocked|Ignored/.test(g)).length, 0);
+    status.textContent = `Done: ${where.device} read on this device, ${where.cloud} in the cloud. ${blocked} detail${blocked === 1 ? '' : 's'} not in the messages ${blocked === 1 ? 'was' : 'were'} not used.`;
+    return xs;
+  }
+  $('aiRealBtn').addEventListener('click', async () => {
+    try { if (await runSet(REAL_SET, aiReal, 'aiRealStatus')) renderReal(); } catch (err) { $('aiRealStatus').textContent = err.message; }
+  });
 
   form.addEventListener('submit', (e) => { e.preventDefault(); runOne(); });
   $('seedsBtn').addEventListener('click', runMany);

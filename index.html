@@ -39,6 +39,7 @@
         </select>
       </label>
       <span id="netState" class="presence hidden" style="color:var(--red);font-weight:600">Offline — still working</span>
+      <button id="fpChip" class="textbtn mono fp" type="button" title="Board fingerprint: a SHA-256 hash chain over every message and action. Same fingerprint = same board.">🔒 <span id="fpShort">…</span></button>
       <span id="presence" class="presence">1 volunteer here</span>
       <button id="meBtn" class="textbtn" type="button">Volunteer: <span id="meName">add your name</span></button>
       <button id="settingsBtn" class="textbtn" type="button">Settings</button>
@@ -142,6 +143,10 @@
         <div id="accuracy"></div>
         <div class="row"><button id="aiHardBtn" class="btn" type="button">Run Gemini on the hard set (uses your Settings choice)</button><span id="aiHardStatus" class="note"></span></div>
         <div id="misses"></div>
+        <h2>Real messages from the 2015 Chennai floods</h2>
+        <p class="lede">60 real tweets posted on 2–3 December 2015 with #ChennaiFloods, picked at random from a public (CC0) archive. Names, handles, door numbers and every phone number are replaced with made-up ones; the wording is as people wrote it. I labelled them by hand after FloodLine was built, and nothing was tuned on them. Real feeds mix requests with helpline lists and offers, so they are left in.</p>
+        <div id="realAccuracy"></div>
+        <div class="row"><button id="aiRealBtn" class="btn" type="button">Run Gemini on the real messages (uses your Settings choice)</button><span id="aiRealStatus" class="note"></span></div>
       </div>
     </section>
 
@@ -205,8 +210,15 @@
       <div class="row"><button id="prepareBtn" class="btn" type="button">Prepare on-device model</button><button class="btn dark" value="close">Done</button></div>
       <hr />
       <h3>Handing over to the next shift</h3>
-      <p class="note">Download everything on this board — every message and every action — as one file, and load it on another device.</p>
-      <div class="row"><button id="exportBtn" class="btn" type="button">Download board</button><label class="btn">Load a board file<input id="importFile" type="file" accept="application/json" hidden /></label></div>
+      <p class="note">Download everything on this board — every message and every action — as one file, and load it on another device. The file holds families' phone numbers, so lock it with a passphrase you tell the next shift in person or on a call (AES-256-GCM, key from PBKDF2-SHA-256, 310,000 rounds; it never leaves this device).</p>
+      <label>Passphrase for the handover file
+        <input id="handoverPass" type="password" autocomplete="new-password" minlength="8" placeholder="at least 8 characters — leave empty for an unlocked file" />
+      </label>
+      <div class="row"><button id="exportBtn" class="btn" type="button">Download board</button><label class="btn">Load a board file<input id="importFile" type="file" accept="application/json,.floodline" hidden /></label></div>
+      <p class="note">Board fingerprint: <b id="fpFull" class="mono">…</b> — a SHA-256 hash chain over every message and action. If two volunteers read out the same fingerprint, their boards are identical; any edit changes it.</p>
+      <hr />
+      <h3>Privacy</h3>
+      <label class="check"><input id="privacyMode" type="checkbox" /> Hide phone numbers on screen (for screen-sharing, photos of the board, or a public place). Call and WhatsApp buttons still work.</label>
     </form>
   </dialog>
 

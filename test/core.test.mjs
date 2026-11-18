@@ -277,3 +277,51 @@ test('on-device (Gemini Nano) answers only fill gaps for water and vulnerable', 
   assert.equal(gap.water, 'knee');                  // nothing from rules: the small model fills the gap
   assert.deepEqual(gap.vulnerable, ['elderly']);
 });
+
+// ---------- security ----------
+import { scamCheck, maskPhone, maskText, chainHead, fingerprint, sealBoard, openBoard, verifyPlain } from '../js/core/security.js';
+import { REAL_SET } from '../js/core/realset.js';
+
+test('scam check flags money / OTP asks and disguised links, never a real 2015 rescue request', () => {
+  assert.equal(scamCheck('Boat rescue team ready for Velachery. Pay Rs 500 registration fee to UPI rescue@okaxis first').level, 'high');
+  assert.equal(scamCheck('NDRF here. Share the OTP you get to confirm your rescue slot').level, 'high');
+  assert.equal(scamCheck('Govt relief form: http://tn-gov-in-relief.com/apply').level, 'check');
+  assert.equal(scamCheck('Register for boat: https://bit.ly/3xRescue').level, 'check');
+  assert.equal(scamCheck('Stuck in Mudichur, 3 people, water waist. 9444123456').level, null);
+  const flagged = REAL_SET.filter((x) => x.kind === 'request' && scamCheck(x.text).level);
+  assert.deepEqual(flagged.map((x) => x.text), []);
+});
+
+test('privacy mode masks phone numbers', () => {
+  assert.equal(maskPhone('9840012345'), '98•••••345');
+  assert.equal(maskText('call 98400 12345 or +91 9444123456 now'), 'call 98•••••345 or 91•••••456 now');
+});
+
+test('board fingerprint is order-independent and changes when an event is edited', async () => {
+  const evs = [{ id: 'a', t: 'report', at: 1, text: 'x' }, { id: 'b', t: 'claim', at: 2, by: 'Ravi' }];
+  const h = await chainHead(evs);
+  assert.equal(h, await chainHead([evs[1], evs[0]]));
+  assert.notEqual(h, await chainHead([evs[0], { ...evs[1], by: 'Someone else' }]));
+  assert.match(fingerprint(h), /^[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}$/);
+  assert.equal((await verifyPlain({ events: evs, chainHead: h })).ok, true);
+  assert.equal((await verifyPlain({ events: [evs[0]], chainHead: h })).ok, false);
+});
+
+test('sealed handover opens with the right passphrase and rejects a wrong one or a changed file', async () => {
+  const board = { app: 'FloodLine', events: [{ id: 'a', t: 'report', at: 1, text: 'Stuck in Adyar 9840012345' }] };
+  const file = await sealBoard(board, 'kotturpuram-night-shift');
+  assert.ok(!JSON.stringify(file).includes('9840012345'));
+  const { board: back } = await openBoard(file, 'kotturpuram-night-shift');
+  assert.deepEqual(back.events, board.events);
+  await assert.rejects(openBoard(file, 'wrong passphrase'));
+  const data = atob(file.data); const flipped = btoa(data.slice(0, 5) + String.fromCharCode(data.charCodeAt(5) ^ 1) + data.slice(6));
+  await assert.rejects(openBoard({ ...file, data: flipped }, 'kotturpuram-night-shift'));
+  await assert.rejects(sealBoard(board, 'short'));
+});
+
+test('real 2015 set: rules group repeats of the same household', () => {
+  const night = { messages: REAL_SET.map((x, i) => ({ id: `r${i}`, at: i, text: x.text, truth: { kind: x.kind, household: x.household } })) };
+  const d = evaluateDedupe(night);
+  assert.equal(REAL_SET.length, 60);
+  assert.ok(d.precision >= 95 && d.recall >= 95, JSON.stringify(d));
+});

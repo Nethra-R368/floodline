@@ -8,6 +8,7 @@ import { isConfigured, deviceStatus, prepareDevice, readMessages } from './ai.js
 import { createMap } from './map.js';
 import { initBench } from './bench.js';
 import { $, esc, store, toast, copyText } from './util.js';
+import { scamCheck, maskPhone, maskText, chainHead, fingerprint, sealBoard, openBoard, verifyPlain } from './core/security.js';
 
 const SEED = 2023;
 const DEMO_START = 20 * 60; // the simulated night starts at 20:00
@@ -223,7 +224,16 @@ const STATUS = { new: 'Unassigned', claimed: 'Taken', enroute: 'Boat on the way'
 const STATUS_TA = { new: 'யாரும் எடுக்கவில்லை', claimed: 'எடுக்கப்பட்டது', enroute: 'படகு வருகிறது', rescued: 'மீட்கப்பட்டனர்', unreachable: 'அடைய முடியவில்லை' };
 const PRIO = { critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low' };
 const isDone = (c) => c.status === 'rescued' || c.status === 'unreachable';
-const fmtPhone = (p) => `${p.slice(0, 5)} ${p.slice(5)}`;
+let privacy = store.get('floodline.privacy') === '1';
+const fmtPhone = (p) => (privacy ? maskPhone(p) : `${p.slice(0, 5)} ${p.slice(5)}`);
+const showText = (t) => (privacy ? maskText(t) : t);
+const scamMemo = new Map();
+const scamOf = (t) => { if (!scamMemo.has(t)) scamMemo.set(t, scamCheck(t)); return scamMemo.get(t); };
+function caseScam(c) {
+  const all = c.reports.map((r) => scamOf(r.text)).filter((x) => x.level);
+  return { level: all.some((x) => x.level === 'high') ? 'high' : all.length ? 'check' : null, reasons: [...new Set(all.flatMap((x) => x.reasons))] };
+}
+const scamBadge = (lvl) => (lvl ? `<span class="scam ${lvl}">⚠ ${lvl === 'high' ? 'Possible scam — verify first' : 'Check the link first'}</span>` : '');
 
 function matchesFilter(c) {
   if (filter === 'action' && !(c.status === 'new' || c.flags.includes('check') || c.flags.includes('says-safe'))) return false;
@@ -270,6 +280,7 @@ function caseHtml(c, rank) {
       <span class="who">${who(c)}</span>
       <span class="where" style="display:block">${esc(c.address || 'no street given')}${c.phones[0] ? ` · ${fmtPhone(c.phones[0])}` : ''}</span>
       <span class="facts" style="display:block">${factsLine(c) || '<span class="muted">no details given</span>'}</span>
+      ${scamBadge(caseScam(c).level)}
     </span>
     <span class="state"><span class="st ${c.status === 'new' ? 'new' : done ? 'closed' : ''}">${STATUS[c.status]}</span><span class="mono">${since}</span>${warnings(c)}</span>
   </button></li>`;
@@ -297,11 +308,12 @@ function render() {
   $('fDone').textContent = state.cases.filter(isDone).length;
 
   els.offerCount.textContent = state.offers.length || '';
-  els.offers.innerHTML = state.offers.slice(-8).reverse().map((o) => `<li>${esc(o.text)}</li>`).join('') || '<li class="muted">Boats, vehicles and food offered by people show up here.</li>';
+  els.offers.innerHTML = state.offers.slice(-8).reverse().map((o) => `<li>${esc(showText(o.text))}${scamBadge(scamOf(o.text).level)}</li>`).join('') || '<li class="muted">Boats, vehicles and food offered by people show up here.</li>';
   els.feed.innerHTML = [...state.reports].sort((a, b) => b.at - a.at).slice(0, 12)
-    .map((r) => `<li><span class="k ${r.x.kind}">${fmtClock(r.at)} ${r.x.kind}</span>${esc(r.text.length > 150 ? `${r.text.slice(0, 150)}…` : r.text)}</li>`).join('') || '<li class="muted">Nothing yet.</li>';
+    .map((r) => `<li><span class="k ${r.x.kind}">${fmtClock(r.at)} ${r.x.kind}</span>${esc(showText(r.text.length > 150 ? `${r.text.slice(0, 150)}…` : r.text))}${scamBadge(scamOf(r.text).level)}</li>`).join('') || '<li class="muted">Nothing yet.</li>';
 
   mapApi.update(state.cases);
+  updateFingerprint();
   state.cases.forEach((c) => seenCases.add(c.id));
   firstRender = false;
   els.aiState.textContent = aiStateText();
@@ -355,7 +367,7 @@ function renderDrawer() {
   const total = c.reasons.reduce((s, r) => s + r.points, 0);
   const points = c.reasons.map((r) => `<tr><td>${esc(r.label)}</td><td>${r.points > 0 ? '+' : ''}${r.points}</td></tr>`).join('')
     + `<tr class="total"><td>Priority: ${PRIO[c.tier].toLowerCase()}</td><td>${total}</td></tr>`;
-  const reports = c.reports.map((r) => `<div class="msg"><div class="meta">${fmtClock(r.at)} · ${esc(r.source || '')} · read by ${r.x.source !== 'ai' ? 'rules' : r.x.where === 'device' ? 'Gemini Nano on this device (checked)' : 'Gemini in the cloud (checked)'}</div>${esc(r.text)}${(r.x.guard || []).filter((g) => /Blocked|Ignored/.test(g)).map((g) => `<div class="blocked">Not used: ${esc(g.replace(/^(Blocked|Ignored)\s*/, ''))}</div>`).join('')}</div>`).join('');
+  const reports = c.reports.map((r) => `<div class="msg"><div class="meta">${fmtClock(r.at)} · ${esc(r.source || '')} · read by ${r.x.source !== 'ai' ? 'rules' : r.x.where === 'device' ? 'Gemini Nano on this device (checked)' : 'Gemini in the cloud (checked)'}</div>${esc(showText(r.text))}${(r.x.guard || []).filter((g) => /Blocked|Ignored/.test(g)).map((g) => `<div class="blocked">Not used: ${esc(g.replace(/^(Blocked|Ignored)\s*/, ''))}</div>`).join('')}</div>`).join('');
   const mergeWhy = [...new Set(c.merges.map((m) => m.why))];
   const history = c.history.map((h) => `<li><span class="mono">${fmtClock(h.at)}</span>${esc(h.by || '')} ${h.t === 'claim' ? 'took this request' : `marked it “${STATUS[h.status] || 'reopened'}”`}${h.note ? ` — ${esc(h.note)}` : ''}</li>`).join('');
 
@@ -365,8 +377,9 @@ function renderDrawer() {
     <h2>${who(c)}</h2>
     <div class="addr">${esc(c.address || 'no street given')}</div>
     <div class="sub">First reported at ${fmtClock(c.firstAt)}${c.status === 'new' ? `, waiting ${fmtMinutes(c.waiting)} with no one assigned` : c.owner ? `, with ${esc(c.owner)}` : ''}.</div>
+    ${(() => { const sc = caseScam(c); return sc.level ? `<div class="scam-box ${sc.level}"><b>⚠ Check before acting.</b> This message ${sc.reasons.join('; ')}. Real rescue teams never ask for money, an OTP or a password, and never need you to install an app. Confirm on an official helpline (112, 1070) before you share it or send anyone.</div>` : ''; })()}
     ${c.flags.includes('stale') ? '<div class="alertbox">No one has taken this request for over 45 minutes.</div>' : ''}
-    ${c.flags.includes('says-safe') ? `<div class="okbox">A later message says this family is safe: “${esc(c.safeReports[0].text.slice(0, 160))}” Call to confirm, then mark it rescued.</div>` : ''}
+    ${c.flags.includes('says-safe') ? `<div class="okbox">A later message says this family is safe: “${esc(showText(c.safeReports[0].text.slice(0, 160)))}” Call to confirm, then mark it rescued.</div>` : ''}
 
     <section><h3>Actions</h3><div class="row">${actions.join('')}</div>
       <div class="row">${phones || '<span class="note">No phone number in any of the messages. Ask the people who shared it.</span>'}</div></section>
@@ -475,27 +488,76 @@ window.addEventListener('offline', refreshAiStatus);
 refreshAiStatus();
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 
-els.exportBtn.addEventListener('click', () => {
-  const blob = new Blob([JSON.stringify({ app: 'FloodLine', workspace: ws, exportedAt: new Date().toISOString(), events: W.events }, null, 1)], { type: 'application/json' });
+let fpTimer = null;
+function updateFingerprint() {
+  clearTimeout(fpTimer);
+  fpTimer = setTimeout(async () => {
+    try {
+      const fp = fingerprint(await chainHead(W.events));
+      $('fpShort').textContent = fp; $('fpFull').textContent = `${fp} (${W.events.length} events)`;
+    } catch { $('fpShort').textContent = '—'; }
+  }, 250);
+}
+$('fpChip').addEventListener('click', () => { els.settingsDialog.showModal(); $('handoverPass').focus(); });
+
+const privacyBox = $('privacyMode');
+privacyBox.checked = privacy;
+document.body.classList.toggle('privacy', privacy);
+privacyBox.addEventListener('change', () => {
+  privacy = privacyBox.checked;
+  store.set('floodline.privacy', privacy ? '1' : '0');
+  document.body.classList.toggle('privacy', privacy);
+  render();
+});
+
+function download(name, obj) {
+  const blob = new Blob([JSON.stringify(obj, null, 1)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `floodline-${ws}-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')}.json`;
+  a.download = name;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+els.exportBtn.addEventListener('click', async () => {
+  const pass = $('handoverPass').value;
+  const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+  const board = { app: 'FloodLine', workspace: ws, exportedAt: new Date().toISOString(), events: W.events };
+  try {
+    if (pass) {
+      const sealed = await sealBoard(board, pass);
+      download(`floodline-${ws}-${stamp}.locked.json`, sealed);
+      toast(`Locked with AES-256-GCM. Fingerprint ${sealed.fingerprint}. Tell the next shift the passphrase by voice, not in the group.`);
+    } else {
+      const head = await chainHead(board.events);
+      download(`floodline-${ws}-${stamp}.json`, { ...board, chainHead: head });
+      toast(`Downloaded, not locked. Fingerprint ${fingerprint(head)}.`);
+    }
+  } catch (err) { toast(err.message); }
 });
 els.importFile.addEventListener('change', async () => {
   const f = els.importFile.files[0];
   if (!f) return;
   try {
-    const data = JSON.parse(await f.text());
+    let data = JSON.parse(await f.text());
+    let note = '';
+    if (data && data.sealed) {
+      const pass = $('handoverPass').value || window.prompt('This board file is locked. Passphrase:') || '';
+      const opened = await openBoard(data, pass);
+      data = opened.board;
+      note = ` Unlocked and verified: fingerprint ${opened.fingerprint}.`;
+    } else if (data && !Array.isArray(data)) {
+      const v = await verifyPlain(data);
+      if (v.ok === false) throw new Error('This file was changed after it was downloaded (fingerprint does not match). Not loaded.');
+      note = v.ok ? ` Verified: fingerprint ${v.fingerprint}.` : ' (old file without a fingerprint)';
+    }
     const evs = (Array.isArray(data) ? data : data.events || []).filter((e) => e && e.id && e.t && typeof e.at === 'number');
     W.events = mergeEvents(W.events, evs);
     saveWorkspace();
     send({ type: 'events', events: evs });
-    toast(`Imported ${evs.length} events`);
+    toast(`Imported ${evs.length} events.${note}`);
     els.settingsDialog.close();
     render();
-  } catch { toast('That file is not a FloodLine log'); }
+  } catch (err) { toast(err && err.message && !/JSON/.test(err.message) ? err.message : 'That file is not a FloodLine board'); }
   els.importFile.value = '';
 });
 
