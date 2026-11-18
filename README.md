@@ -92,7 +92,7 @@ The hand-written set below is mine, so it can't prove much on its own. I also to
 | Who is vulnerable | 92.9% | 85.7% | 95.2% |
 | Water level | 97.6% | 78.6% | 95.2% |
 
-- **Repeats are real:** the 42 real requests were about 37 households (one pregnant woman in Velachery was posted again and again by different people). FloodLine grouped them with 100% precision and 100% recall.
+- **Repeats are real:** the 42 real requests were about 37 households (a Tambaram family's request appears three times, each tagging a different celebrity; a woman in labour in Ramapuram was posted once alone and again inside a request for four women with three phone numbers). FloodLine grouped them with 100% precision and 100% recall.
 - **Checks matter more on real text:** on this set FloodLine's checks dropped 25 details Gemini Nano returned that were not in the messages, and 4 from cloud Gemini.
 - **What it showed me to fix:** only 22 of the 60 messages name one of the 28 localities FloodLine knows (Ashok Nagar, Saligramam, Nandambakkam, Jafferkhanpet… are missing), and spellings like "Ekkattuthangal" slip past the rules. Real feeds also mix requests with helpline lists, which is where rules and Nano lose most points.
 - Runs on November 18, 2026; Nano in Chrome 157 on a laptop with no internet. Repeat them on the Results page.
