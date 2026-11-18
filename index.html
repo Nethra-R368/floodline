@@ -48,6 +48,7 @@
         </select>
       </label>
       <span id="netState" class="presence hidden" style="color:var(--red);font-weight:600">Offline — still working</span>
+      <span id="shareChip" class="presence hidden" title="This board is shared, end-to-end encrypted">🔐 shared</span>
       <button id="fpChip" class="textbtn mono fp" type="button" title="Board fingerprint: a SHA-256 hash chain over every message and action. Same fingerprint = same board.">🔒 <span id="fpShort">…</span></button>
       <span id="presence" class="presence">1 volunteer here</span>
       <button id="meBtn" class="textbtn" type="button">Volunteer: <span id="meName">add your name</span></button>
@@ -201,6 +202,23 @@
         </ul>
         <p>FloodLine is a shared list for that job. Volunteers paste the messages in. It pulls out the area, phone number, number of people, water level and who is vulnerable; merges repeats of the same household; puts the most urgent at the top with the reasons written out; and keeps each request on the list until someone marks the family as rescued.</p>
 
+        <h2>Tested on a real flood</h2>
+        <p>The <b>Real flood test</b> tab plays 520 real rescue posts from the night of 2–3 December 2015 in Chennai — exactly as people wrote them, at the minute they were posted, with names and numbers changed. FloodLine turned them into a list of 247 households, caught over 200 reposts of families already on the list, and put 49 critical households (women in labour, babies, people needing medical care) at the top. On 60 of those posts labelled by hand, Gemini in the cloud with FloodLine's checks read 94.7% of the details right.</p>
+
+        <h2>Who it is for</h2>
+        <ul>
+          <li><b>Volunteer control rooms</b> — the 5–50 people who, in every Chennai flood, sit with phones and laptops reading the requests that pour into WhatsApp groups and social media, and pass them to boat teams.</li>
+          <li><b>Resident welfare associations and NGOs</b> that run their own rescue and relief in one area.</li>
+          <li><b>Officials</b> who receive forwarded lists from volunteers and need them without repeats and in order of urgency.</li>
+        </ul>
+
+        <h2>How a group starts using it</h2>
+        <ol>
+          <li>Open the site once on each laptop before the monsoon (it then works offline), and press "Prepare" in Settings to download Gemini Nano.</li>
+          <li>When a flood starts, switch to the live board and paste messages in as they arrive — one at a time or a whole exported WhatsApp chat.</li>
+          <li>Take a request, call or WhatsApp the family from the request, mark it rescued. At the end of a shift, download the board locked with a passphrase and hand it to the next shift.</li>
+        </ol>
+
         <h2>It has been done before</h2>
         <p>In the 2018 Kerala floods, volunteers built <a href="https://www.thenewsminute.com/kerala/these-1500-techies-came-together-manage-keralas-official-rescue-website-free-87069" target="_blank" rel="noopener">keralarescue.in</a>, an open-source site for rescue requests that the state adopted as its official one. FloodLine is a much smaller attempt at the same idea for Chennai, built for the way requests actually arrive here — as forwarded WhatsApp messages in Tamil, English and Tanglish.</p>
 
@@ -214,10 +232,18 @@
         <ul>
           <li>Boards sync between windows on one device. Different phones need a small server, which isn't built yet.</li>
           <li>On-device AI needs desktop Chrome with Gemini Nano; elsewhere Gemini runs in the cloud, which needs internet. Without either, rules still read every message.</li>
-          <li>It knows 28 flood-prone Chennai localities. Anything else shows as "area not recognised".</li>
+          <li>It knows 54 Chennai localities (28 flood-prone ones plus 26 the real 2015 posts kept naming). Anything else shows as "area not recognised".</li>
           <li>Pins are at the locality, not the house.</li>
           <li>It reads text only — not voice notes or photos.</li>
-          <li>It has not been used in a real flood. The results page is a simulation.</li>
+          <li>It has been tested on real posts from the 2015 flood, but not yet used live by a volunteer group during a flood. The boat comparison on the Results page is a simulation.</li>
+        </ul>
+
+        <h2>What comes next</h2>
+        <ul>
+          <li><b>One board across phones:</b> Firebase Firestore with sign-in for a group, keeping the same event log, hash chain and end-to-end-locked handover.</li>
+          <li><b>WhatsApp intake:</b> forward a message to a FloodLine number instead of pasting it.</li>
+          <li><b>Voice notes:</b> many requests arrive as Tamil voice notes; Gemini can transcribe them on the device.</li>
+          <li><b>A pilot with a Chennai volunteer group</b> before the next north-east monsoon.</li>
         </ul>
 
         <h2>Privacy</h2>
@@ -247,6 +273,11 @@
       <p class="note"><b>On this device:</b> <span id="aiDeviceState">checking…</span></p>
       <p class="note"><b>Cloud:</b> <span id="aiCloudState">checking…</span></p>
       <div class="row"><button id="prepareBtn" class="btn" type="button">Prepare on-device model</button><button class="btn dark" value="close">Done</button></div>
+      <hr />
+      <h3>One board on every volunteer's phone</h3>
+      <p class="note">Works on the live board. Create a group code and read it out to the other volunteers; everyone who enters it sees the same board, live. Every message and action is encrypted on this device before it is sent (AES-256-GCM, key made from the code), so the server only ever stores ciphertext. Changes made offline are sent when the network is back.</p>
+      <div class="row"><button id="shareCreate" class="btn dark" type="button">Create a shared board</button><input id="shareCode" class="mono" placeholder="or enter a group code: XXXX-XXXX-XXXX-XXXX" autocomplete="off" spellcheck="false" style="min-width:16em" /><button id="shareJoin" class="btn" type="button">Join</button><button id="shareLeave" class="textbtn hidden" type="button">Stop sharing</button></div>
+      <p id="shareStatus" class="note" role="status" aria-live="polite"></p>
       <hr />
       <h3>Handing over to the next shift</h3>
       <p class="note">Download everything on this board — every message and every action — as one file, and load it on another device. The file holds families' phone numbers, so lock it with a passphrase you tell the next shift in person or on a call (AES-256-GCM, key from PBKDF2-SHA-256, 310,000 rounds; it never leaves this device).</p>

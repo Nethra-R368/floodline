@@ -95,3 +95,31 @@ export async function verifyPlain(file) {
   const head = await chainHead(file.events);
   return { ok: head === file.chainHead, fingerprint: fingerprint(head) };
 }
+
+// ---------- shared boards, end-to-end encrypted ----------
+// A group code (e.g. "K7QM-2XDA-9PTV-C3HF", 80 random bits) is shared by voice. From it each device derives
+//   boardId = first 32 hex of SHA-256("floodline-board:" + code)   -> where the encrypted log lives
+//   key     = PBKDF2-SHA-256(code, salt = boardId, 310,000 rounds) -> AES-256-GCM key, never leaves the device
+// The server stores only { c: ciphertext, iv }, so it never sees a family's name, place or number.
+const B32 = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+export function newGroupCode() {
+  const r = crypto.getRandomValues(new Uint8Array(16));
+  return [...r].map((b) => B32[b % 32]).join('').replace(/(.{4})(?=.)/g, '$1-');
+}
+export const normaliseCode = (code) => String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/(.{4})(?=.)/g, '$1-');
+export async function boardKeys(code) {
+  const c = normaliseCode(code);
+  if (c.replace(/-/g, '').length < 16) throw new Error('A group code has 16 letters and digits.');
+  const boardId = hex(await crypto.subtle.digest('SHA-256', enc.encode(`floodline-board:${c}`))).slice(0, 32);
+  const key = await keyFrom(c, enc.encode(boardId));
+  return { code: c, boardId, key };
+}
+export async function sealEvent(key, ev) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, enc.encode(JSON.stringify(ev)));
+  return { c: b64(ct), iv: b64(iv) };
+}
+export async function openEvent(key, doc) {
+  const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: unb64(doc.iv) }, key, unb64(doc.c));
+  return JSON.parse(new TextDecoder().decode(plain));
+}

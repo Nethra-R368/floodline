@@ -1,10 +1,10 @@
 // Hybrid AI with Firebase AI Logic: messages are read by Gemini Nano on this device when Chrome has it
 // (works with no internet, nothing leaves the phone/laptop), and by Gemini in the cloud otherwise.
 // Every answer still goes through FloodLine's checks (guardAi) before it reaches the board.
-import { FIREBASE_CONFIG, RECAPTCHA_SITE_KEY } from './firebase-config.js';
+import { FIREBASE_CONFIG } from './firebase-config.js';
+import { firebaseApp, FB } from './firebase.js';
 import { buildExtractPrompt, parseExtractReply, EXTRACT_SCHEMA } from './core/prompt.js';
 
-const FB = 'https://www.gstatic.com/firebasejs/13.1.0/';
 const MODE_NAME = { auto: 'PREFER_ON_DEVICE', device: 'ONLY_ON_DEVICE', cloud: 'ONLY_IN_CLOUD' };
 // Tried in order; a model that is busy (500/503) hands over to the next one.
 const CLOUD_MODELS = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.1-flash-lite'];
@@ -20,24 +20,12 @@ export const isConfigured = () => !!(FIREBASE_CONFIG && FIREBASE_CONFIG.apiKey &
 
 async function load() {
   if (sdk) return sdk;
-  if (!loading) {
-    loading = (async () => {
-      const [appMod, aiMod, checkMod] = await Promise.all([
-        import(`${FB}firebase-app.js`), import(`${FB}firebase-ai.js`), import(`${FB}firebase-app-check.js`),
-      ]);
-      const app = appMod.initializeApp(FIREBASE_CONFIG);
-      try {
-        if (RECAPTCHA_SITE_KEY) {
-          checkMod.initializeAppCheck(app, { provider: new checkMod.ReCaptchaEnterpriseProvider(RECAPTCHA_SITE_KEY), isTokenAutoRefreshEnabled: true });
-        }
-      } catch (err) {
-        console.warn('App Check could not start (offline?). On-device reading still works.', err);
-      }
-      ai = aiMod.getAI(app, { backend: new aiMod.GoogleAIBackend() });
-      sdk = aiMod;
-      return sdk;
-    })();
-  }
+  loading ||= (async () => {
+    const [app, aiMod] = await Promise.all([firebaseApp(), import(`${FB}firebase-ai.js`)]);
+    ai = aiMod.getAI(app, { backend: new aiMod.GoogleAIBackend() });
+    sdk = aiMod;
+    return sdk;
+  })();
   return loading;
 }
 

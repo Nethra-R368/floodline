@@ -5,10 +5,13 @@ import { generateNight, tripMinutes } from './core/sim.js';
 import { splitMessages } from './core/input.js';
 import { HARD_SET } from './core/hardset.js';
 import { REAL_STREAM } from './core/realstream.js';
+import { STREAM_AI } from './core/realstream_ai.js';
 import { isConfigured, deviceStatus, prepareDevice, readMessages } from './ai.js';
 import { createMap } from './map.js';
 import { initBench } from './bench.js';
 import { $, esc, store, toast, copyText } from './util.js';
+import { joinBoard, pushEvents, leaveBoard, sharedCode } from './sync.js';
+import { newGroupCode } from './core/security.js';
 import { scamCheck, maskPhone, maskText, chainHead, fingerprint, sealBoard, openBoard, verifyPlain } from './core/security.js';
 
 const SEED = 2023;
@@ -104,6 +107,7 @@ function addEvents(evs) {
   W.events.push(...evs);
   saveWorkspace();
   send({ type: 'events', events: evs });
+  if (ws === 'live' && sharedCode()) pushEvents(evs).catch(() => {});
   scheduleRender();
 }
 
@@ -125,7 +129,10 @@ function tick() {
   const evs = [];
   while (W.cursor < msgs.length && msgs[W.cursor].at <= W.clock) {
     const m = msgs[W.cursor++];
-    evs.push({ t: 'report', id: `d${m.id}`, at: m.at, text: m.text, source: ws === 'r2015' ? 'X (Twitter), 2 Dec 2015 · real, anonymised' : 'WhatsApp group (simulated)', x: extractRules(m.text) });
+    const rules = extractRules(m.text);
+    const ai2015 = ws === 'r2015' ? STREAM_AI[Number(m.id.slice(1))] : null;
+    const x = ai2015 ? { ...rules, ...ai2015, areaId: ai2015.areaId || rules.areaId, phones: ai2015.phones && ai2015.phones.length ? ai2015.phones : rules.phones, source: 'ai' } : rules;
+    evs.push({ t: 'report', id: `d${m.id}`, at: m.at, text: m.text, source: ws === 'r2015' ? 'X (Twitter), 2 Dec 2015 · real, anonymised' : 'WhatsApp group (simulated)', x });
   }
   if (evs.length) { W.events.push(...evs); send({ type: 'events', events: evs }); }
   if (els.autoBoats.checked) runBoats();
@@ -508,6 +515,37 @@ function updateFingerprint() {
 }
 $('fpChip').addEventListener('click', () => { els.settingsDialog.showModal(); $('handoverPass').focus(); });
 
+// ---------------- shared board across phones (end-to-end encrypted) ----------------
+const shareSay = (msg, bad) => { const el = $('shareStatus'); el.textContent = msg; el.style.color = bad ? 'var(--red)' : 'var(--green)'; el.style.fontWeight = '600'; };
+async function startSharing(code) {
+  if (ws !== 'live') switchWorkspace('live');
+  shareSay('Connecting…');
+  try {
+    const c = await joinBoard(code, (evs) => {
+      if (ws !== 'live') { const L = loadWorkspace('live'); L.events = mergeEvents(L.events, evs); store.set('floodline.ws.live', JSON.stringify(L)); return; }
+      W.events = mergeEvents(W.events, evs);
+      saveWorkspace();
+      send({ type: 'events', events: evs });
+      scheduleRender();
+    }, (st) => {
+      if (st.state === 'error') shareSay(`Could not reach the shared board: ${st.error}`, true);
+      else shareSay(`🔐 Shared board ${st.code} · ${st.state === 'live' ? 'live' : 'offline — changes will be sent when the network is back'} · ${st.count ?? 0} encrypted events on the server${st.pending ? ' · sending…' : ''}`);
+    });
+    store.set('floodline.shareCode', c);
+    $('shareCode').value = c;
+    $('shareChip').classList.remove('hidden');
+    $('shareLeave').classList.remove('hidden');
+    await pushEvents(W.events); // share what is already on this board
+  } catch (err) { shareSay(err.message, true); }
+}
+$('shareCreate').addEventListener('click', () => startSharing(newGroupCode()));
+$('shareJoin').addEventListener('click', () => startSharing($('shareCode').value));
+$('shareLeave').addEventListener('click', () => {
+  leaveBoard(); store.remove('floodline.shareCode');
+  $('shareChip').classList.add('hidden'); $('shareLeave').classList.add('hidden');
+  shareSay('Stopped sharing. This board stays on this device.');
+});
+
 const privacyBox = $('privacyMode');
 privacyBox.checked = privacy;
 document.body.classList.toggle('privacy', privacy);
@@ -623,5 +661,6 @@ const mapApi = createMap($('map'), (id) => openDrawer(id));
 const bench = initBench({ getAi: () => ai });
 updateMe();
 switchWorkspace(ws);
+if (ws === 'live' && store.get('floodline.shareCode')) startSharing(store.get('floodline.shareCode'));
 if (isReplay() && W.clock > 0 && W.clock < endOf()) els.play.textContent = '▶ Resume';
 window.addEventListener('beforeunload', () => store.set(`floodline.ws.${ws}`, JSON.stringify(W)));

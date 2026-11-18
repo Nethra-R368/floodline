@@ -351,3 +351,20 @@ test('prompt injection inside a message cannot make the AI invent details for it
   assert.ok(x.guard.some((g) => /unknown area/.test(g)));
   assert.ok(x.guard.some((g) => /address not written/.test(g)));
 });
+
+import { newGroupCode, normaliseCode, boardKeys, sealEvent, openEvent } from '../js/core/security.js';
+test('shared board: same code gives same board and key; ciphertext hides the family; other codes cannot read it', async () => {
+  const code = newGroupCode();
+  assert.match(code, /^[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+  const a = await boardKeys(code), b = await boardKeys(code.toLowerCase().replace(/-/g, ' '));
+  assert.equal(a.boardId, b.boardId); assert.equal(a.boardId.length, 32);
+  const ev = { t: 'report', id: 'r1', at: 1, text: 'Pregnant lady stuck, Velachery 2nd main road, 9840012345' };
+  const doc = await sealEvent(a.key, ev);
+  assert.ok(!doc.c.includes('9840012345') && !atob(doc.c).includes('Velachery'));
+  assert.deepEqual(await openEvent(b.key, doc), ev);
+  const other = await boardKeys(newGroupCode());
+  assert.notEqual(other.boardId, a.boardId);
+  await assert.rejects(openEvent(other.key, doc));
+  await assert.rejects(boardKeys('short'));
+  assert.equal(normaliseCode('k7qm 2xda 9ptv c3hf'), 'K7QM-2XDA-9PTV-C3HF');
+});

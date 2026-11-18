@@ -1,0 +1,23 @@
+rules_version = '2';
+
+// FloodLine shared boards. A board is found only by an id derived from its group code (SHA-256),
+// and every event is AES-256-GCM ciphertext made on the volunteer's device: the server never sees
+// a family's name, place or phone number. The log is append-only, so history can't be rewritten.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /boards/{board}/events/{event} {
+      allow get, list: if request.auth != null;
+      allow create: if request.auth != null
+        && board.size() == 32 && event.size() <= 64
+        && request.resource.data.keys().hasOnly(['c', 'iv', 'by', 'ts'])
+        && request.resource.data.by == request.auth.uid
+        && request.resource.data.ts == request.time
+        && request.resource.data.c is string && request.resource.data.c.size() <= 20000
+        && request.resource.data.iv is string && request.resource.data.iv.size() <= 24;
+      allow update, delete: if false;
+    }
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

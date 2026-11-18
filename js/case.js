@@ -20,8 +20,10 @@ async function aiReads() {
   try { return (await import('./core/realstream_ai.js')).STREAM_AI; } catch { return null; }
 }
 
+export const withAi = (r, a) => ({ ...r, ...a, areaId: a.areaId || r.areaId, phones: a.phones && a.phones.length ? a.phones : r.phones, source: 'ai' });
+
 function stateFor(xs) {
-  const evs = REAL_STREAM.map((m, i) => ({ t: 'report', id: `R${i}`, at: m.at, text: m.text, source: 'X, 2 Dec 2015', x: xs ? { ...extractRules(m.text), ...xs[i], source: 'ai' } : extractRules(m.text) }));
+  const evs = REAL_STREAM.map((m, i) => ({ t: 'report', id: `R${i}`, at: m.at, text: m.text, source: 'X, 2 Dec 2015', x: xs ? withAi(extractRules(m.text), xs[i]) : extractRules(m.text) }));
   return { evs, st: buildState(evs, REAL_STREAM[REAL_STREAM.length - 1].at + 1) };
 }
 
