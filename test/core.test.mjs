@@ -325,3 +325,11 @@ test('real 2015 set: rules group repeats of the same household', () => {
   assert.equal(REAL_SET.length, 60);
   assert.ok(d.precision >= 95 && d.recall >= 95, JSON.stringify(d));
 });
+
+test('a woman in labour with no other details is still critical', () => {
+  const p = scoreCase({ vulnerable: ['pregnant'], water: null, trapped: false, people: null, needs: [], reportIds: ['a'] }, 0);
+  assert.equal(p.tier, 'critical');
+  assert.ok(p.reasons.some((r) => /Time-critical/.test(r.label)));
+  const q = scoreCase({ vulnerable: ['elderly'], water: 'knee', trapped: false, people: 2, needs: [], reportIds: ['a'] }, 0);
+  assert.notEqual(q.tier, 'critical');
+});

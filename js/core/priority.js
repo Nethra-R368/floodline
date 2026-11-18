@@ -10,6 +10,8 @@ export const WEIGHTS = {
   suppliesOnly: -15,
 };
 
+const CRITICAL_FLOOR = 70;
+
 const LABEL = {
   pregnant: 'Pregnant / in labour',
   medical: 'Medical need (dialysis, oxygen, injury…)',
@@ -41,6 +43,10 @@ export function scoreCase(c, waitingMin = 0) {
   const extra = (c.reportIds ? c.reportIds.length : 1) - 1;
   if (extra > 0) add(`Reported ${extra + 1} times`, Math.min(WEIGHTS.maxReports, extra * WEIGHTS.perExtraReport));
   if (c.needs.length && !c.needs.includes('rescue') && !c.water && !c.trapped) add('Supplies only (no rescue asked)', WEIGHTS.suppliesOnly);
+  // A household the ground rules call time-critical (pregnant / in labour, medical, baby, neck-deep water)
+  // is never shown below "critical", however few other details the message gives.
+  const raw = reasons.reduce((s, r) => s + r.points, 0);
+  if (isCritical(c) && raw < CRITICAL_FLOOR) add('Time-critical: moved up to critical', CRITICAL_FLOOR - raw);
   reasons.sort((a, b) => b.points - a.points);
   const score = Math.max(0, reasons.reduce((s, r) => s + r.points, 0));
   const tier = score >= 70 ? 'critical' : score >= 45 ? 'high' : score >= 25 ? 'medium' : 'low';
