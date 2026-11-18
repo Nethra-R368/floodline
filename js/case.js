@@ -44,7 +44,7 @@ function hourly(evs, st) {
       ${i % 2 === 0 ? `<text x="${i * bw + bw / 2}" y="${H - 6}" text-anchor="middle" font-size="11" fill="var(--muted)">${String(h % 24).padStart(2, '0')}h</text>` : ''}`;
   }).join('');
   return `<svg viewBox="0 0 ${W} ${H}" class="chart" role="img" aria-label="Posts per hour and new households per hour">${bars}</svg>
-    <p class="note"><span class="key" style="background:var(--blue-bg);border:1px solid var(--blue)"></span> real posts per hour &nbsp; <span class="key" style="background:var(--red)"></span> of them, households FloodLine had not seen before. Late at night most posts are reposts of families already on the board.</p>`;
+    <p class="note"><span class="key" style="background:var(--blue-bg);border:1px solid var(--blue)"></span> real posts per hour &nbsp; <span class="key" style="background:var(--red)"></span> of them, households FloodLine had not seen before. After midnight, most posts are reposts of families already on the board or helpline numbers, not new families: that is when a hand-read chat buries the few new requests.</p>`;
 }
 
 function fieldCell(want, got, ok) {
