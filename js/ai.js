@@ -54,7 +54,7 @@ function getModel(mode, cloudModel = CLOUD_MODELS[0]) {
         createOptions: LM_OPTIONS,
         promptOptions: { responseConstraint: EXTRACT_SCHEMA },
       },
-    }, { timeout: 30000 });
+    }, { timeout: 90000 });
   }
   return models[key];
 }
