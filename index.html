@@ -140,7 +140,7 @@
         <h2>How well does it read messy messages?</h2>
         <p class="lede">Two test sets. The generated night is easy — it uses phrasings the rules were written for. The hard set is 30 messages I wrote and labelled by hand to look like real ones: landmarks instead of area names, Tamil number words, typos, loose offers. I did not tune the rules on it.</p>
         <div id="accuracy"></div>
-        <div class="row"><button id="aiHardBtn" class="btn" type="button">Run Gemini on the hard set</button><span id="aiHardStatus" class="note"></span></div>
+        <div class="row"><button id="aiHardBtn" class="btn" type="button">Run Gemini on the hard set (uses your Settings choice)</button><span id="aiHardStatus" class="note"></span></div>
         <div id="misses"></div>
       </div>
     </section>
@@ -164,11 +164,12 @@
         <p>Points, not a black box: pregnant or in labour +40, needs medical care +40, neck-deep water +35, baby +25, elderly +20, cannot walk +20, stuck on a terrace +20, plus time waiting with no one assigned and how many times it was reported. Every request shows its points. A volunteer can always overrule the order.</p>
 
         <h2>Where the AI is used, and where it isn't</h2>
-        <p>Messages are first read by plain rules that work offline and never make things up. If a volunteer adds a Gemini key, Gemini re-reads each message to catch what rules miss ("near Phoenix mall" is Velachery; "old couple" is two people). Anything Gemini returns is checked against the original message: a phone number that isn't in the text, an area that isn't on the map or an address nobody wrote is thrown away, and the request says so.</p>
+        <p>Messages are first read by plain rules that work offline and never make things up. Then Gemini re-reads each message to catch what rules miss ("near Phoenix mall" is Velachery; "old couple" is two people). Where Chrome has it, this happens with <b>Gemini Nano on the device itself</b>: it works with no internet, which is exactly when floods knock networks out, and the message never leaves the device. Otherwise Gemini runs in the cloud. Both go through Firebase AI Logic. Anything Gemini returns is checked against the original message: a phone number that isn't in the text, an area that isn't on the map or an address nobody wrote is thrown away, and the request says so.</p>
 
         <h2>What it can't do yet</h2>
         <ul>
           <li>Boards sync between windows on one device. Different phones need a small server, which isn't built yet.</li>
+          <li>On-device AI needs desktop Chrome with Gemini Nano; elsewhere Gemini runs in the cloud, which needs internet. Without either, rules still read every message.</li>
           <li>It knows 28 flood-prone Chennai localities. Anything else shows as "area not recognised".</li>
           <li>Pins are at the locality, not the house.</li>
           <li>It reads text only — not voice notes or photos.</li>
@@ -176,7 +177,7 @@
         </ul>
 
         <h2>Privacy</h2>
-        <p>There is no FloodLine server. Messages stay in the volunteer's browser. If Gemini is switched on, the message text is sent to Google's Gemini API to be read, and nowhere else.</p>
+        <p>There is no FloodLine server. Messages stay in the volunteer's browser. When Gemini Nano reads a message on the device, nothing is sent anywhere. When Gemini reads it in the cloud, the message text goes to Google's Gemini API through Firebase, and nowhere else.</p>
 
         <h2>Who made it</h2>
         <p>Nethra R, a student, built FloodLine in November 2026. The code is open source under the MIT licence: <a href="https://github.com/Nethra-R368/floodline" target="_blank" rel="noopener">github.com/Nethra-R368/floodline</a>. If you run a volunteer group and want to try it, or you see something wrong, open an issue there.</p>

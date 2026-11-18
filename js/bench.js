@@ -16,7 +16,10 @@ const METRICS = [
 ];
 
 // Last recorded Gemini run on the hand-labelled set (README has the details).
-const MEASURED = { date: '14 November 2026', model: 'gemini-3.6-flash', overall: 98.6, fields: { kind: 100, area: 96.7, phones: 100, people: 100, vulnerable: 95.7, water: 100 } };
+const MEASURED = {
+  cloud: { date: '14 November 2026', model: 'Gemini 3.6 Flash (cloud)', overall: 98.6, fields: { kind: 100, area: 96.7, phones: 100, people: 100, vulnerable: 95.7, water: 100 } },
+  device: null, // filled in once measured with Gemini Nano on a real device
+};
 
 const show = (v, time) => (v == null ? '—' : time ? fmtMinutes(v) : String(v));
 
@@ -31,7 +34,7 @@ export function initBench({ getAi }) {
   const form = $('benchForm');
   const out = $('benchResults');
   let ran = false;
-  let aiHard = null;
+  const aiHard = { cloud: null, device: null };
 
   function params() {
     const fd = new FormData(form);
@@ -95,14 +98,19 @@ export function initBench({ getAi }) {
     const fields = [['kind', 'Type of message (request, update, offer, other)'], ['area', 'Area'], ['phones', 'Phone numbers'], ['people', 'Number of people'], ['vulnerable', 'Who is vulnerable'], ['water', 'Water level']];
     const genMap = { kind: gen.kind, area: gen.area, phones: gen.phone, people: gen.people, vulnerable: gen.vulnerable, water: gen.water };
     const cell = (v) => (v == null ? '—' : `${v}%`);
-    $('accuracy').innerHTML = `<table class="cmp"><thead><tr><th>Field</th><th>Generated night, rules</th><th>Hard set, rules</th><th>Hard set, Gemini + checks</th></tr></thead><tbody>
-      ${fields.map(([k, label]) => `<tr><td>${label}</td><td class="n">${cell(genMap[k])}</td><td class="n">${cell(rules.fields[k])}</td><td class="n">${cell((aiHard || MEASURED).fields[k])}</td></tr>`).join('')}
-      <tr><td><b>All fields</b></td><td class="n"></td><td class="n"><b>${rules.overall}%</b></td><td class="n"><b>${(aiHard || MEASURED).overall}%</b></td></tr>
+    const cloud = aiHard.cloud || MEASURED.cloud;
+    const device = aiHard.device || MEASURED.device;
+    const col = (r, k) => (r ? cell(k === 'overall' ? r.overall : r.fields[k]) : '<span class="muted">not measured</span>');
+    $('accuracy').innerHTML = `<table class="cmp"><thead><tr><th>Field</th><th>Generated night, rules</th><th>Hard set, rules (offline)</th><th>Hard set, Gemini in the cloud + checks</th><th>Hard set, Gemini Nano on this device + checks</th></tr></thead><tbody>
+      ${fields.map(([k, label]) => `<tr><td>${label}</td><td class="n">${cell(genMap[k])}</td><td class="n">${cell(rules.fields[k])}</td><td class="n">${col(cloud, k)}</td><td class="n">${col(device, k)}</td></tr>`).join('')}
+      <tr><td><b>All fields</b></td><td class="n"></td><td class="n"><b>${rules.overall}%</b></td><td class="n"><b>${col(cloud, 'overall')}</b></td><td class="n"><b>${col(device, 'overall')}</b></td></tr>
       </tbody></table>
-      <p class="note">${aiHard ? 'Gemini column: the run you just did.' : `Gemini column: measured on ${MEASURED.date} with ${MEASURED.model}. Its two mistakes: an Adyar river warning placed in Kotturpuram, and a woman in labour also marked as needing medical care. Press the button below to run it again with your own key.`}</p>
+      <p class="note">Cloud column: ${aiHard.cloud ? 'the run you just did.' : `measured on ${MEASURED.cloud.date} with ${MEASURED.cloud.model}; its two mistakes were an Adyar river warning placed in Kotturpuram, and a woman in labour also marked as needing medical care.`}
+      On-device column: ${aiHard.device ? 'the run you just did, with no data leaving this device.' : device ? `measured on ${device.date} with ${device.model}.` : 'needs desktop Chrome with Gemini Nano; prepare it in Settings, then press the button below.'}</p>
       <p class="note">Grouping repeats on the generated night: ${dd.reports} request messages became ${dd.clusters} households; there were really ${dd.households}. (Precision ${dd.precision}%, recall ${dd.recall}%.)</p>`;
-    const src = aiHard || rules;
-    $('misses').innerHTML = `<h2>What ${aiHard ? 'Gemini' : 'the rules'} still get wrong on the hard set</h2>
+    const last = aiHard.device || aiHard.cloud;
+    const src = last || rules;
+    $('misses').innerHTML = `<h2>What ${last ? (aiHard.device ? 'Gemini Nano' : 'Gemini in the cloud') : 'the rules'} still get wrong on the hard set</h2>
       <p class="note">${src.misses.length} mistakes out of ${src.checks} checks.</p>
       ${src.misses.slice(0, 14).map((m) => `<div class="miss"><b>${m.field}</b>: should be ${esc(JSON.stringify(m.want))}, got ${esc(JSON.stringify(m.got))}<br><span class="muted">${esc(m.text.slice(0, 130))}</span></div>`).join('')}`;
   }
@@ -116,7 +124,7 @@ export function initBench({ getAi }) {
     status.textContent = 'Gemini is reading the 30 messages…';
     try {
       const { xs, where } = await readMessages(HARD_SET.map((h) => h.text), ai.mode === 'off' ? 'auto' : ai.mode, (d, n, src) => { status.textContent = `Gemini has read ${d} of ${n} (${src === 'device' ? 'on this device' : 'in the cloud'})…`; });
-      aiHard = scoreHardSet((t, i) => xs[i]);
+      aiHard[where.device >= where.cloud ? 'device' : 'cloud'] = scoreHardSet((t, i) => xs[i]);
       const blocked = xs.reduce((s, x) => s + (x.guard || []).filter((g) => /Blocked|Ignored/.test(g)).length, 0);
       status.textContent = `Done: ${where.device} read on this device, ${where.cloud} in the cloud. ${blocked} detail${blocked === 1 ? '' : 's'} not in the messages ${blocked === 1 ? 'was' : 'were'} not used.`;
       renderAccuracy(generateNight({ seed: params().seed, households: params().households }));
