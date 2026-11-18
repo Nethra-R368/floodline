@@ -714,7 +714,7 @@ export const REAL_SET = [
  {
   "text": "#ChennaiFloods : Dr Latha M 9648136482, @user 2 people are stuck, they r in terrace, please save them by #boat. Pls help Urgent",
   "kind": "request",
-  "areaId": "ramapuram",
+  "areaId": null,
   "phones": [
    "9648136482"
   ],
