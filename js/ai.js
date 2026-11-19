@@ -50,14 +50,19 @@ function getModel(mode, cloudModel = CLOUD_MODELS[0]) {
 // Busy, timed out or out of free quota: each model has its own quota, so try the next one.
 const BUSY = /\b(429|500|503)\b|quota|resource.?exhausted|high demand|overloaded|unavailable|internal|time.?out|expired|abort/i;
 
+// A model that ran out of free quota is skipped for 10 minutes instead of being retried on every message.
+const cooldown = new Map();
 async function generate(mode, prompt) {
   let last;
-  for (const name of CLOUD_MODELS) {
+  const live = CLOUD_MODELS.filter((m) => !(cooldown.get(m) > Date.now()));
+  for (const name of live.length ? live : CLOUD_MODELS.slice(-1)) {
     try {
       return await getModel(mode, name).generateContent(prompt);
     } catch (err) {
       last = err;
-      if (mode === 'device' || !BUSY.test(String(err && err.message || err))) throw err;
+      const msg = String(err && err.message || err);
+      if (mode === 'device' || !BUSY.test(msg)) throw err;
+      if (/\b429\b|quota|exhausted/i.test(msg)) cooldown.set(name, Date.now() + 10 * 60000);
     }
   }
   throw last;

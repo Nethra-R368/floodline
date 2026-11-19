@@ -467,7 +467,7 @@ const DEVICE_TEXT = {
   available: 'Ready. Gemini Nano runs on this device.',
   downloadable: 'Can be downloaded to this device (one time, a few GB).',
   downloading: 'Downloading…',
-  unavailable: "This device can't run it (needs desktop Chrome 139+ with enough memory).",
+  unavailable: 'Not ready on this device. In desktop Chrome, turn on chrome://flags/#prompt-api-for-gemini-nano-multimodal-input and restart; until then messages are read in the cloud.',
   unsupported: 'Not available in this browser. Use desktop Chrome 139+ and turn on chrome://flags/#prompt-api-for-gemini-nano-multimodal-input.',
 };
 async function refreshAiStatus() {
