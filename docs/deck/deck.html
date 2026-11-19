@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>FloodLine</title>
+<style>
+@page { size: 1280px 720px; margin: 0; }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: "Segoe UI", system-ui, sans-serif; color: #1b1b19; }
+.s { width: 1280px; height: 720px; padding: 56px 64px; position: relative; overflow: hidden; page-break-after: always; background: #f6f5f1; }
+.s.dark { background: #0e0e0e; color: #eee; }
+.k { font: 600 15px "Consolas", monospace; color: #b3261e; letter-spacing: .06em; text-transform: uppercase; margin-bottom: 14px; }
+.dark .k { color: #f2675b; }
+h1 { font-size: 76px; margin: 0 0 16px; color: #f2675b; }
+h2 { font-size: 40px; margin: 0 0 22px; line-height: 1.15; }
+p, li { font-size: 22px; line-height: 1.45; }
+ul { padding-left: 24px; margin: 0; } li { margin-bottom: 10px; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 36px; align-items: start; }
+img { width: 100%; border-radius: 10px; box-shadow: 0 6px 24px rgba(0,0,0,.18); display: block; }
+.big { font-size: 64px; font-weight: 700; color: #b3261e; line-height: 1; }
+.tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin: 18px 0 24px; }
+.tile { background: #fff; border: 1px solid #e2e0d8; border-radius: 10px; padding: 18px; }
+.tile span { display: block; font-size: 17px; color: #555; margin-top: 8px; line-height: 1.3; }
+.foot { position: absolute; bottom: 26px; left: 64px; right: 64px; font-size: 15px; color: #777; display: flex; justify-content: space-between; }
+.dark .foot { color: #999; }
+.quote { font-size: 30px; line-height: 1.4; border-left: 5px solid #f2675b; padding-left: 22px; margin: 26px 0; }
+small { font-size: 16px; color: #666; }
+</style></head><body>
+
+<section class="s dark">
+  <div class="k">Innovate India 2026 · Open innovation · Nethra R</div>
+  <h1>FloodLine</h1>
+  <h2 style="color:#fff;max-width:900px">A flood rescue board that keeps working in airplane mode</h2>
+  <div class="quote">“#Pregnant lady in #labour pain, Mukambikai Nagar, Ramapuram”<br><small style="color:#aaa">a real post, 2 December 2015, 21:17 (number changed)</small></div>
+  <p style="max-width:960px;color:#ccc">Volunteers paste the SOS messages. FloodLine reads them with AI on the laptop, groups repeats, ranks urgency and makes sure no request is lost. People decide who is rescued.</p>
+  <div class="foot"><span>nethra-r368.github.io/floodline</span><span>github.com/Nethra-R368/floodline · youtu.be/lbxbXQ5wG_Q</span></div>
+</section>
+
+<section class="s">
+  <div class="k">1 · The problem</div>
+  <div class="two">
+    <div>
+      <h2>When Chennai floods, rescue requests drown too</h2>
+      <ul>
+        <li>2015, 2023, 2024, 2025: phone lines fail, requests move to WhatsApp and Twitter.</li>
+        <li>Volunteers read them <b>by hand, all night</b>.</li>
+        <li>The same family is posted 12 times by different relatives; helpline lists mix with real cries for help.</li>
+        <li>Requests nobody picks up scroll out of sight.</li>
+        <li><b>Mobile data fails first</b>, so cloud-only tools stop exactly when they are needed.</li>
+      </ul>
+    </div>
+    <img src="../screenshots/board.jpg" alt="">
+  </div>
+  <div class="foot"><span>FloodLine</span><span>2</span></div>
+</section>
+
+<section class="s">
+  <div class="k">2 · The solution</div>
+  <div class="two">
+    <div>
+      <h2>Paste the messages → one rescue list</h2>
+      <ul>
+        <li><b>Reads each message:</b> phone, area, people, water level, who is vulnerable.</li>
+        <li><b>Groups repeats</b> of the same family and says why.</li>
+        <li><b>Ranks by urgency</b> with points anyone can read (pregnant +40, neck-deep water +35…).</li>
+        <li><b>Tracks every request</b> until a person closes it; warns when two volunteers take the same family.</li>
+        <li>Shows <b>how exact the location is</b> and asks to confirm the address before a boat goes.</li>
+      </ul>
+    </div>
+    <img src="../screenshots/request.jpg" alt="">
+  </div>
+  <div class="foot"><span>FloodLine</span><span>3</span></div>
+</section>
+
+<section class="s">
+  <div class="k">3 · Innovation</div>
+  <div class="two">
+    <div>
+      <h2>Hybrid AI that works with no internet, and never decides alone</h2>
+      <ul>
+        <li><b>Gemini Nano on the laptop</b> reads messages in airplane mode; Gemini in the cloud when connected (Firebase AI Logic).</li>
+        <li>Every AI answer is <b>checked against the message</b>: an invented phone number or place is dropped and shown.</li>
+        <li>The AI <b>can never remove a request</b>: doubtful ones stay on the list, marked for a person.</li>
+        <li>Fake rescue posts asking for money are flagged “verify first”.</li>
+      </ul>
+    </div>
+    <img src="../screenshots/offline.jpg" alt="">
+  </div>
+  <div class="foot"><span>FloodLine</span><span>4</span></div>
+</section>
+
+<section class="s">
+  <div class="k">4 · Tested on the real 2015 flood (a replay, not a deployment)</div>
+  <h2>520 real posts from 2 December 2015, replayed at the minute they were posted</h2>
+  <div class="tiles">
+    <div class="tile"><div class="big">216</div><span>requests on the list, from 325 posts</span></div>
+    <div class="tile"><div class="big">68</div><span>critical: pregnant, babies, medical</span></div>
+    <div class="tile"><div class="big">59</div><span>helpline-like groups kept for a person to check, never hidden</span></div>
+    <div class="tile"><div class="big">0</div><span>phone numbers invented by Gemini</span></div>
+  </div>
+  <p>On 60 labelled posts the board gets <b>89.9%</b> of details right with cloud Gemini, <b>79.8%</b> with Gemini Nano offline, <b>81.1%</b> with rules alone. <small>Initial check: labels made with the AI assistant; independent labelling in progress. Data: public CC0 archive, names and numbers replaced.</small></p>
+  <div class="foot"><span>FloodLine</span><span>5</span></div>
+</section>
+
+<section class="s">
+  <div class="k">5 · Technology & security</div>
+  <div class="two">
+    <div>
+      <h2>Built to hold phone numbers of families in danger</h2>
+      <ul>
+        <li>Web app, works offline (service worker), no server of its own.</li>
+        <li>Firebase AI Logic · Gemini Nano · Gemini 3.x Flash · App Check (reCAPTCHA Enterprise).</li>
+        <li><b>End-to-end encrypted</b> shared board: group code → AES-256-GCM key on each device; Firestore stores only ciphertext.</li>
+        <li>Lost phone? Move the group to a new code.</li>
+        <li>Open source (MIT) · 33 unit tests · every number reproducible from the repo.</li>
+      </ul>
+    </div>
+    <img src="../screenshots/server.jpg" alt="">
+  </div>
+  <div class="foot"><span>FloodLine</span><span>6</span></div>
+</section>
+
+<section class="s dark">
+  <div class="k">6 · Impact & next steps</div>
+  <h2 style="color:#fff">Who it helps: volunteer rescue groups and the families waiting for them</h2>
+  <ul style="color:#ddd;max-width:1080px">
+    <li>Simulation (a model, not a real flood): households never reached fall from <b>26.8 → 1.2</b> a night; wasted boat trips <b>26.7 → 0.4</b>.</li>
+    <li>Works on phones and laptops volunteers already have, even when mobile data is down.</li>
+    <li><b>Next:</b> a drill with a Chennai volunteer group before the monsoon · volunteer accounts and roles · reading voice notes and photos (Gemini Nano multimodal).</li>
+    <li><b>Honest status:</b> working and deployed, not yet used in a real flood. Built by Nethra R with an AI coding assistant (Claude Code).</li>
+  </ul>
+  <div class="foot"><span>Try it: nethra-r368.github.io/floodline</span><span>Video: youtu.be/lbxbXQ5wG_Q · Code: github.com/Nethra-R368/floodline</span></div>
+</section>
+</body></html>
