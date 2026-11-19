@@ -2,166 +2,108 @@
 
 [![tests](https://github.com/Nethra-R368/floodline/actions/workflows/test.yml/badge.svg)](https://github.com/Nethra-R368/floodline/actions/workflows/test.yml) · MIT · no build step · **Live: https://nethra-r368.github.io/floodline/**
 
-A rescue board for volunteer groups during Chennai floods. Volunteers paste the requests that pour in on WhatsApp, X and SMS; FloodLine reads them (English, Tamil, Tanglish), groups repeats of the same family, puts the most urgent at the top with the reasons written out, keeps every request on the list until someone marks the family rescued — and keeps working when the network doesn't.
+A rescue board for volunteer groups during Chennai floods. Volunteers paste the requests that pour in on WhatsApp, X and SMS; FloodLine reads them, groups repeats of the same family, orders them by urgency with the reasons written out, and keeps every request on the list until a person closes it. It keeps working when the network doesn't. **It helps people decide; it never decides who gets rescued.**
 
-**Tested on the real 2015 Chennai flood.** 520 real rescue posts from the night of 2–3 December 2015, replayed at the minute they were posted and read by Gemini through Firebase AI Logic: 229 households, 99 repeat posts merged (one pregnant woman was posted 12 times), 138 helpline posts kept off the list, 65 critical households first, 103 made-up AI details caught. On 60 of those posts labelled by hand, cloud Gemini with FloodLine's checks reads **94.7%** of the details right. Open the site — it starts on that replay.
+**Status, honestly:** a working web app, tested by replaying 520 real posts from the 2015 Chennai flood and with unit tests. It has **not** been used by a rescue group in a real flood yet. Most of the code was written by an AI coding assistant (Claude Code) working from my direction, design decisions and testing; see [Who built what](#who-built-what).
 
-- **Hybrid AI:** Gemini Nano on the device when Chrome has it (works with no internet), Gemini in the cloud otherwise — both through Firebase AI Logic, both checked against the message.
-- **Security:** scam and phishing flags, one board shared across phones with end-to-end encryption (Firestore only ever holds ciphertext, append-only rules), locked shift handover, tamper-evident fingerprint, privacy mode, App Check, CSP + SRI. See the Security tab.
-- **29 unit tests**, run on every push.
-
-Demo video: https://youtu.be/2TtRTdWzyA0 · longer walkthrough: https://youtu.be/dKdgLOt9mkk
+Demo video: https://youtu.be/2TtRTdWzyA0
 
 | The real 2015 night, replayed | One family, posted 12 times |
 |---|---|
 | ![Board after replaying 520 real posts](docs/screenshots/board.jpg) | ![The Mudichur request, reported 12 times](docs/screenshots/request.jpg) |
 | **Real flood test** | **How well it understood** |
-| ![Real flood test page](docs/screenshots/case.jpg) | ![Accuracy on 60 hand-labelled real posts](docs/screenshots/accuracy.jpg) |
+| ![Real flood test page](docs/screenshots/case.jpg) | ![Accuracy on 60 labelled real posts](docs/screenshots/accuracy.jpg) |
 | **Security** | **Phone** |
 | ![Security page](docs/screenshots/security.jpg) | ![Phone layout](docs/screenshots/phone.jpg) |
 
 ## Why
 
-During the 2015, 2023 (Michaung), 2024 (Fengal) and 2025 (Ditwah) floods, phone lines went down and rescue requests moved to social media. Volunteer groups read them by hand and passed them to boat teams. The same problems came up each time:
-
-- One family is posted many times by different relatives, so two boats go to the same house.
-- Nobody knows which requests are already handled, so old ones keep being forwarded after the family is safe.
-- A request nobody picked up scrolls out of view.
-
-This has been tried before: in the 2018 Kerala floods, volunteers built keralarescue.in, an open-source rescue request site that the state adopted as its official one. FloodLine is a much smaller attempt at the same idea, built around how requests arrive in Chennai: forwarded WhatsApp messages, often in Tamil or Tanglish.
+In the 2015, 2023 (Michaung), 2024 (Fengal) and 2025 (Ditwah) floods, phone lines went down and rescue requests moved to social media. Volunteer groups read them by hand and passed them to boat teams. The same problems came up each time: one family posted many times by different relatives; helpline numbers mixed in with requests; requests that nobody picked up scrolling out of view. In the 2018 Kerala floods, volunteers built keralarescue.in, an open-source request site the state adopted; FloodLine is a smaller attempt at the same idea for the way requests arrive in Chennai — as free-text posts, not forms.
 
 ## What it does
 
-- **Reads messages.** Rules pull out the area, phone numbers, number of people, water level and who is vulnerable (pregnant, needs medical care, baby, elderly, cannot walk). They work offline. Gemini then re-reads each message to catch what rules miss, like landmarks ("near Phoenix mall" is Velachery) or "old couple" meaning two people — on the device with Gemini Nano when Chrome has it, in the cloud otherwise (see below).
-- **Checks the AI.** Anything Gemini returns that isn't in the original message — a phone number, an unknown area, an address nobody wrote — is not used, and the request shows what was dropped.
-- **Groups repeats.** Messages with the same phone number, or the same door number and street in the same area, become one request. It says why they were grouped.
-- **Orders by urgency, with points you can see.** Pregnant or in labour +40, medical +40, neck-deep water +35, baby +25, elderly +20, cannot walk +20, on a terrace +20, plus time waiting and number of reports. A household that is time-critical (pregnant or in labour, medical, baby, neck-deep water) is never shown below critical.
-- **Keeps track.** A request nobody takes for 45 minutes is marked. A taken request with no update for 90 minutes is marked. A later "we are safe" message, or people still sharing after a rescue, is marked too, with a reply in Tamil and English that volunteers can copy.
-- **Works as a team.** Every action is saved as an event. With a group code, one board is shared across every volunteer's phone (end-to-end encrypted); a shift can also hand the whole board over as a locked file.
-- Map of requests (OpenStreetMap), call and WhatsApp buttons, a Tamil + English message asking the family if they still need help, phone layout, dark mode. The helpline numbers (112, 1070, 1077, 1913) are always shown at the top.
+- **Reads each message.** Rules (offline, instant) pull out the area, phone numbers, people, water level and who is vulnerable. Gemini then re-reads it through Firebase AI Logic — **on the device with Gemini Nano** when Chrome has it, **in the cloud** otherwise — and every AI answer is checked against the message.
+- **Never lets the AI hide a request.** If the rules see a request and the AI thinks it's a helpline or an update, it stays on the list, marked "check", below the clear requests. A person decides.
+- **Groups repeats** by the same phone number or the same address, and says why.
+- **Orders by urgency, with points you can read:** pregnant or in labour +40, medical +40, neck-deep water +35, baby +25, elderly +20, cannot walk +20, terrace +20, plus waiting time and repeats. Time-critical households are never shown below "critical". The order is advice; volunteers can take any request.
+- **Shows how precise the location is** — door number and street / street or landmark / area only / unknown — and asks for the address to be confirmed on a call before a boat goes ("Address confirmed" is recorded).
+- **Keeps track:** unclaimed for 45 minutes, no update for 90 minutes, a later "we are safe" message, two volunteers taking the same family, people still sharing after a rescue — all flagged. Closing a *critical* request asks how it was confirmed.
+- **Works as a team:** one board across devices with a group code, end-to-end encrypted (below); every action records the volunteer's name and device.
+- Map (OpenStreetMap, area-level pins), call / WhatsApp buttons, a Tamil + English follow-up message, phone layout, dark mode, helplines 112 / 1070 / 1077 / 1913 always on top.
 
 ## Works when the network doesn't
 
-Floods take out mobile data first. FloodLine is built for that:
+- **Offline app:** after one visit, a service worker keeps the app on the device.
+- **Hybrid AI:** Firebase AI Logic with `InferenceMode.PREFER_ON_DEVICE` — Gemini Nano in Chrome reads messages with no internet and the text never leaves the device; otherwise Gemini in the cloud (fallback chain: 3.6 Flash → 3.5 Flash → 3.1 Flash-Lite, each skipped for 10 minutes after it runs out of free quota). Same JSON schema both ways; each request says which one read it.
+- **Rules always run**, so with no network and no model the board still fills.
 
-- **The app works offline.** After one visit, a service worker keeps the page, its libraries and the map tiles already seen on the device. With no signal, volunteers can still paste messages, see the board, take and close requests.
-- **Hybrid AI with Firebase AI Logic.** Messages are read by **Gemini Nano on the device** when Chrome has it (no internet needed, and the messages never leave the phone or laptop), and by **Gemini in the cloud** when it doesn't. Each request says which one read it. Settings lets a group choose: on-device first (default), on-device only, cloud only, or rules only.
-- **Rules always run.** If there is no network and no on-device model, the rule reader still fills the board, so nothing waits on AI.
-- **The same checks apply to both.** Whatever Gemini returns — on the device or in the cloud — goes through FloodLine's checks before it reaches the board.
-- **The cloud side is locked to this site.** Firebase App Check (reCAPTCHA Enterprise) means only FloodLine's own pages can use the project. There is no API key to paste and none in the repo; the Firebase config in `js/firebase-config.js` is a public identifier. If a cloud model is busy or out of free quota, the next one is tried (Gemini 3.6 Flash → 3.5 Flash → 3.1 Flash-Lite).
+On-device reading needs desktop Chrome with the Prompt API (Gemini Nano) enabled; press "Prepare" in Settings once.
 
-On-device reading needs desktop Chrome 139 or later with the Gemini Nano model; press "Prepare" in Settings once to download it.
+## Tested on the real 2015 Chennai flood (a replay, not a deployment)
+
+**Data.** A public CC0 archive of #ChennaiFloods tweets ([OpenLinkedSocialData/ChennaiFloods_tw](https://github.com/OpenLinkedSocialData/ChennaiFloods_tw), 34,717 unique texts, 2 Dec 14:13 UTC – 3 Dec 07:00 UTC 2015). The 593 that mention being stuck, rescue, water or a vulnerable person **and** contain a phone number; identical copies removed → **520 posts**, kept in the order and at the minute they were posted. Names, @handles, links, door numbers and every phone number are replaced by a script, keeping number formats valid (`scripts/`). The archive is a hashtag sample, mostly English, and the phone-number filter is a selection bias.
+
+**Replay** (*Real replay* board and *Real flood test* page). All 520 posts read by Gemini 3.1 Flash-Lite in the cloud (recorded raw answers in `js/core/realstream_ai.js`; FloodLine's current checks are applied when the page loads):
+
+- **216 requests on the list**, from 325 posts — 109 posts repeated a request already there (one pregnant woman in Mudichur posted 12 times).
+- **68 critical**: 17 pregnant or in labour, 23 with a baby, 15 needing medical care.
+- **59 groups (184 posts) the AI thinks are helplines** — kept at the bottom, marked "check", never hidden.
+- **0 phone numbers invented** by Gemini (37 landline numbers it listed were set aside as not mobile).
+- Location: 74 requests with a door number and street, 83 with a street or landmark, 36 area only, 23 place unknown.
+- 0 posts flagged as scams.
+- Known gap: some "contact this number for rescue" helpline posts are read as requests by both the rules and the AI (e.g. an 11-post group in Ashok Nagar).
+
+The archive has the posts, not what happened next: this shows what FloodLine would have put in front of volunteers, not where boats went.
+
+**Accuracy — an initial check, not proof.** 60 of the posts, sampled at random (seed 2015), were labelled field by field (228 checks). **The labels were made by the AI assistant that helped build FloodLine**, and the same assistant wrote the rules, so this is a first check; an independent human labelling is under way ([`label.html`](https://nethra-r368.github.io/floodline/label.html)). Scores are computed from recorded raw answers in this repository (`js/core/measured.js`, `js/core/evaluate.js`), 19 November 2026:
+
+| On 60 real posts | Rules (offline) | Gemini Nano on the device + checks | Gemini 3.1 Flash-Lite, cloud + checks |
+|---|---|---|---|
+| All fields, as shown on the board | 81.1% | 79.8% | **89.9%** |
+| The AI's own reading, all fields | — | 81.6% | 95.2% |
+| Number of people | 10% | 50% | 95% |
+| Area | 86.4% | 77.3% | 100% |
+| Phone numbers invented | — | 1 | 0 |
+| Real requests the AI read as something else (kept anyway) | — | 1 | 0 |
+
+The board's "type of message" is deliberately pinned to the rules' "request" whenever the AI disagrees (safety over accuracy), which is why the board scores are below the AI's own reading. The rules column improved after 26 localities the real posts kept naming were added, so it is no longer a blind test. Repeats on these 60: 42 request posts about 37 households, grouped with 100% precision and recall.
+
+**Also:** 30 messages written and labelled by the AI assistant to look like real ones (`js/core/hardset.js`): rules 90.3% (head counts 37.5%); Gemini 3.6 Flash 98.6% (14 Nov); Gemini Nano 88.3% (18 Nov, after a small-model policy chosen on this set — not held-out).
+
+**Simulation (Results page).** The same synthetic night is played twice with 10 boats — today's way (volunteers read the chat in order) and with FloodLine. Over 20 synthetic nights: households never reached 26.8 → 1.2; boat trips to already-rescued families 26.7 → 0.4; critical households waiting over 3 hours 14.0 → 5.3; median waits slightly longer (2h 42m → 2h 47m). Every assumption is editable on the page. It is a model, not evidence from a flood.
 
 ## Security and privacy
 
-A rescue board is fed from public, unverified posts and holds families' phone numbers. FloodLine treats both as security problems (`js/core/security.js`, all in the browser with Web Crypto):
+What is protected, how, and how it was checked (details on the in-app *Security* tab and in [`docs/HOW_IT_WORKS.md`](docs/HOW_IT_WORKS.md)):
 
-- **Scam and phishing check on every message.** Disasters bring fake "rescue" and "relief" posts. A message that asks for money, UPI or bank details, or for an OTP, PIN or password, is marked *Possible scam — verify first*; so is a link that is shortened, points at a bare IP address, uses a disguised (punycode) name, downloads an `.apk`, or imitates an official site. The request shows why and tells the volunteer to confirm on 112 / 1070 first. On the real 2015 messages below it flags **none of the 42 real rescue requests**, and 1 of 593 rescue-related tweets overall (a "free phone recharge, call Paytm" post).
-- **Encrypted shift handover.** The board file a shift hands to the next can be locked with a passphrase: AES-256-GCM, key derived with PBKDF2-SHA-256 (310,000 rounds), random salt and IV. A wrong passphrase, or a single changed byte, is refused.
-- **Tamper-evident board fingerprint.** Every message and action is folded into a SHA-256 hash chain; its head is shown as a short fingerprint (e.g. `57E8-B548-7836`). Two volunteers who read out the same fingerprint have identical boards. Files carry the fingerprint and are checked on load.
-- **Privacy mode.** One switch masks every phone number on screen (`98•••••345`) for screen-sharing or photos of the board; the call and WhatsApp buttons still work.
-- **One board across phones, end-to-end encrypted.** Volunteers who enter the same group code share one live board through Firestore. Each message and action is encrypted on the device (AES-256-GCM, key from the code with PBKDF2-SHA-256, 310,000 rounds) before it is sent, so Firestore holds only ciphertext; the board's id is a SHA-256 of the code. [`firestore.rules`](firestore.rules) make the log append-only and accept writes only from signed-in (anonymous) volunteers, stamped with the server time. Offline changes are queued and sent when the network returns.
-- **Content Security Policy and Subresource Integrity.** The page may only load code from itself, the pinned map library and Firebase; the map library is checked with SHA-384 integrity hashes. All message text is escaped before display (tested with an injected `<img onerror>`).
-- **Prompt injection.** The model fills a fixed schema for one message at a time and can't act; its answer is checked against the message (tested with an "ignore your instructions" post).
-- **No secrets in the client.** No API keys in the code or the repo; the cloud model is reachable only from this site through Firebase App Check.
+- **Shared board, end-to-end encrypted.** Each event is AES-256-GCM encrypted on the device with a key derived from an 80-bit random group code (PBKDF2-SHA-256, 310,000 rounds). Firestore stores ciphertext plus metadata (board id = SHA-256 of the code, event ids, server timestamps, anonymous user ids) — not names, places or numbers. [`firestore.rules`](firestore.rules): append-only, signed-in only, server timestamps, fixed fields. Tested live: editing or deleting an event, adding a plaintext field, posing as another user, a fake timestamp, listing boards, writing outside boards and writing while signed out are all denied; a signed-in user *can* add junk ciphertext to a board path they know, so sign-in now requires Firebase App Check (also enforced on the Gemini calls).
+- **Leaked code / lost phone:** "Move to a new group code" copies the board under a new key (old-code devices stop getting updates); "Forget this board on this device". *Not yet:* the board in browser storage is not encrypted at rest.
+- **Who did what:** every action records name and device; two volunteers taking the same request is flagged; closing a critical request needs a stated confirmation. *Not yet:* individual accounts and roles — anyone with the code can add events.
+- **AI checks:** a phone number must be in the message, an area must be a known locality, an address must mostly be words from the message; the AI can't remove a request. Prompt-injection and XSS cases are unit-tested.
+- **Scam and phishing flags:** money / UPI / OTP asks (English and Tamil, amounts in words), shortened, punycode, IP, `.apk`, look-alike and free-hosting links; flags none of the 520 real posts. Pattern-based: it says "verify first", never "safe".
+- **Locked handover file** (AES-256-GCM, passphrase) — a wrong passphrase or one changed byte is refused. The fingerprint of an *unlocked* file only catches accidental changes.
+- **Cloud AI and privacy:** with cloud reading on, message text (including phone numbers) goes to Google's Gemini API; choose "Only on this device" to keep it local. No API keys in the repo; CSP and Subresource Integrity on the page.
 
+## Who built what
 
-## Does it help?
+- **Nethra R** — the problem and the product, design decisions, what to measure and what to cut, testing direction, the voice-over; independent labelling of the real posts (in progress).
+- **Claude Code (AI coding assistant)** — most of the code, the data-processing scripts, the labels on the 30 written and 60 real posts, the gazetteer coordinates (approximate, typed from general knowledge), and these docs.
+- An independent engineering audit of the project (also AI-assisted) found and led to fixing: wrongly anonymised phone numbers that had inflated "AI made it up" counts, the AI being able to hide a request, simultaneous claims, and several overstated claims.
 
-I can't test this in a real flood, so the Results page plays the same simulated night twice with the same ten boats: once the way groups coordinate today (read the chat top to bottom, call back, post in the boat group), and once with FloodLine. FloodLine's real code reads every message. All the assumptions can be changed on the page.
-
-Averages over 20 simulated nights, 110 households each:
-
-| | Today's way | With FloodLine | Nights better / worse |
-|---|---|---|---|
-| Households no boat ever reached | 26.8 | 1.2 | 20 / 0 |
-| Critical households that waited over 3 hours or were never reached | 14.0 | 5.3 | 19 / 1 |
-| Boat trips to a family already rescued | 26.7 | 0.4 | 20 / 0 |
-| Boat trips to a family that had already got out | 6.9 | 1.3 | 18 / 0 |
-| Median wait, critical households that were reached | 1h 01m | 1h 03m | 7 / 13 |
-| Median wait, everyone who was reached | 2h 42m | 2h 47m | 9 / 11 |
-
-The median waits are slightly longer with FloodLine. Two reasons: the medians only count households that were reached, and today's way never reaches about 27 of them; and FloodLine sends boats to critical households first, so lower-risk ones wait longer.
-
-### The real flood test: 520 real posts, replayed
-
-The **Real flood test** tab and the **Real replay: Chennai, 2 Dec 2015** board play every rescue-related post with a phone number from the archive below — **520 real posts** from 19:43 on 2 December to 12:30 on 3 December 2015 — in the order and at the minute they were posted, anonymised (`js/core/realstream.js`). Read by Gemini in the cloud through Firebase AI Logic and checked by FloodLine (recorded in `js/core/realstream_ai.js`):
-
-- **229 households** needing help; **99 posts** were reposts of a family already on the board (a pregnant woman in Mudichur was posted 12 times, another in Velachery 8 times).
-- **138 helpline / offer posts** kept off the request list, so boats aren't sent to a helpline number.
-- **65 critical households** at the top: 17 pregnant or in labour, 23 with a baby, 12 needing medical care.
-- **103 details** Gemini returned that the posts never said were dropped by the checks.
-- At 22:00 on 2 December a volunteer would already have had 94 households from 162 posts, 30 of them critical, in order.
-
-The archive has the posts, not what happened next: this shows what FloodLine would have put in front of volunteers and in what order, not where boats actually went.
-
-### Tested on real messages from the 2015 Chennai floods
-
-The hand-written set below is mine, so it can't prove much on its own. I also took **60 real tweets** posted on 2–3 December 2015 with #ChennaiFloods, from a public CC0 archive ([OpenLinkedSocialData/ChennaiFloods_tw](https://github.com/OpenLinkedSocialData/ChennaiFloods_tw), 34,717 unique tweets), picked at random (seed 2015) from the 593 that mention being stuck, rescue, water or a vulnerable person and contain a phone number. Names, handles, door numbers and every phone number are replaced with made-up ones (the same real number always maps to the same made-up number, so reposts stay detectable); the wording is as people wrote it. Helpline lists and offers are left in, because real feeds are full of them. I labelled them after FloodLine was built and tuned nothing on them (`js/core/realset.js`).
-
-| On 60 real 2015 messages (228 checks) | Rules (offline) | Gemini Nano on the device + checks | Gemini in the cloud + checks |
-|---|---|---|---|
-| All fields | 78.1% | 78.1% | **94.7%** |
-| Number of people | 10% | 70% | 90% |
-| Type of message (request / offer / other) | 68.3% | 63.3% | 91.7% |
-| Area (of the 28 known localities) | 63.6% | 72.7% | 100% |
-| Phone numbers | 97.6% | 97.6% | 97.6% |
-| Who is vulnerable | 92.9% | 85.7% | 95.2% |
-| Water level | 97.6% | 78.6% | 95.2% |
-
-- **Repeats are real:** the 42 real requests were about 37 households (a Tambaram family's request appears three times, each tagging a different celebrity; a woman in labour in Ramapuram was posted once alone and again inside a request for four women with three phone numbers). FloodLine grouped them with 100% precision and 100% recall.
-- **Checks matter more on real text:** on this set FloodLine's checks dropped 25 details Gemini Nano returned that were not in the messages, and 4 from cloud Gemini.
-- **What it showed me to fix:** only 22 of the 60 messages name one of the 28 localities FloodLine knows (Ashok Nagar, Saligramam, Nandambakkam, Jafferkhanpet… are missing), and spellings like "Ekkattuthangal" slip past the rules. Real feeds also mix requests with helpline lists, which is where rules and Nano lose most points.
-- Runs on November 18, 2026; Nano in Chrome 157 on a laptop with no internet. Repeat them on the Results page.
-
-How well it reads messages (hand-written set):
-
-- On the 269 generated messages, rules get every field right. That is easy for them, because the generator uses phrasings the rules know.
-- On 30 messages I wrote and labelled by hand to look like real ones (landmarks, Tamil number words, typos), and did not tune the rules on, rules get 90.3% of fields right — but only 37.5% of head counts.
-- On the same 30 messages, Gemini (gemini-3.6-flash, run on November 14, 2026) with FloodLine's checks gets **98.6%** of fields right, and **100%** of head counts ("old couple", "my amma alone", Tamil "மூன்று பேர்"). Its two mistakes: it placed an Adyar river advisory in Kotturpuram (the bridge it mentions), and it marked a woman in labour as needing medical care as well as pregnant. Nothing it returned had to be blocked on this run. You can repeat the test on the Results page, in the cloud or with Gemini Nano on your own device.
-- On the same 30 messages, **Gemini Nano on the device** (Chrome 157 on a laptop, no internet, run on November 18, 2026) with FloodLine's checks gets **88.3%** of fields right: area 96.7%, phones 100%, head counts 68.8% (rules alone: 37.5%), vulnerable 87%, water level 78.3%, message type 90%. It is weaker than cloud Gemini, so FloodLine treats it as a small model: on the device, Gemini Nano only fills gaps for water level and vulnerable people (fields the rules already read well) and is trusted for area, head counts and message type. I chose that policy after a first on-device run on this same set scored 84.8%, when Nano was overriding correct water levels and adding vulnerable flags nobody wrote; so the 88.3% is not a held-out number. Five details Nano returned on this run were not in the messages and were dropped by the checks.
-- Grouping repeats on the generated night: 230 request messages became 110 households, which is the true number.
-
-These are simulations. They show what better coordination can do under the stated assumptions, not what happened in a real flood.
-
-## Limits
-
-- Shared boards use a group code and anonymous sign-in; there are no individual accounts or roles yet.
-- It knows 28 flood-prone Chennai localities; on real 2015 messages only 22 of 60 named one of them. Pins are at the locality, not the house.
-- It reads text only, not voice notes or photos.
-- It has not been used in a real flood.
-
-## Run it
-
-No build step and no server.
+## Run it and reproduce the numbers
 
 ```bash
 python -m http.server 8000      # then open http://localhost:8000
-node --test test/core.test.mjs  # 29 unit tests
+node --test test/core.test.mjs  # 33 unit tests
 ```
 
-Cloud AI on localhost uses the same Firebase project (localhost is allowed in its App Check key). To use your own project, put its web config in `js/firebase-config.js`, turn on Firebase AI Logic with the Gemini Developer API, and register a reCAPTCHA Enterprise key in App Check.
+Every number above can be recomputed from the repository; commands are in [`docs/HOW_IT_WORKS.md`](docs/HOW_IT_WORKS.md#reproduce-the-numbers). The 2015 data pipeline is in [`scripts/`](scripts/).
 
-## Code
+## Limits
 
-```
-js/core/extract.js    reads one message with rules
-js/core/prompt.js     Gemini prompt, and the checks on what Gemini returns
-js/core/dedupe.js     groups messages about the same household
-js/core/priority.js   points and their reasons
-js/core/store.js      event log → current board (status, warnings)
-js/core/sim.js        simulated night and the today-vs-FloodLine comparison
-js/core/hardset.js    the 30 hand-labelled test messages
-js/core/security.js   scam / phishing check, privacy masking, hash-chain fingerprint, AES-256-GCM handover
-js/core/realset.js    60 real, anonymised 2015 messages, hand-labelled
-js/core/realstream.js 520 real, anonymised 2015 posts with their times; realstream_ai.js = Gemini's reading
-js/sync.js            shared board: Firestore + Auth, events AES-256-GCM encrypted on the device
-js/case.js            the Real flood test page
-js/ai.js              hybrid AI: Gemini Nano on the device, Gemini in the cloud (Firebase AI Logic)
-sw.js                 offline copy of the app
-js/app.js, bench.js, map.js   the page
-```
-
-Everything in `js/core/` is plain functions with unit tests. More detail: [docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md).
+- Not yet used in a real flood or a drill with a rescue group.
+- Locations are area centres unless a door number and street are given; coordinates are approximate.
+- Reads text only — not voice notes or photos. Tamil and Tanglish are handled but barely evaluated.
+- Shared boards: one code per group, no roles; local storage not encrypted.
 
 Made by Nethra R. MIT licence. Map data © OpenStreetMap contributors.

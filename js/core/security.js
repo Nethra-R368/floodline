@@ -6,8 +6,15 @@
 // Everything runs in the browser with Web Crypto; nothing here needs a server or the network.
 
 const MONEY = /\b(upi|g ?pay|google ?pay|phone ?pe|paytm|bhim|send (?:me )?(?:rs\.?|₹|money|cash)|transfer (?:rs|₹|money|amount)|donat(?:e|ion)s? (?:to|at|via)|account (?:no|number)|a\/c(?: no)?|ifsc|bank details|registration fee|advance (?:payment|amount))\b|₹\s?\d|\b(?:rs|inr)\.?\s?\d{2,6}(?!\d)/i;
+// Tamil: rupees, send / pay money, fee. English amounts in words ("pay five hundred"), booking / registration fees.
+const MONEY_TA = /(ரூபாய்|ரூ\.?\s?\d|பணம்\s*(அனுப்ப|கட்ட|செலுத்த)|கட்டணம்)/;
+const MONEY_WORDS = /\b(pay|send|transfer|deposit)\b[^.\n]{0,40}\b(hundred|thousand|rupees|bucks|amount|fee)\b|\b(booking|registration|processing|slot)\s+(fee|charge|amount)\b/i;
 const SECRET = /\b(otp|one time password|pin(?: number)?|cvv|password|aadhaar (?:no|number|otp)|card number)\b/i;
-const URL_RE = /\b(?:https?:\/\/|www\.)[^\s<>"']+/gi;
+// Full links, and bare domains with a path ("tn-relief.in/form").
+const URL_RE = /\b(?:https?:\/\/|www\.)[^\s<>"']+|\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:in|com|org|net|app|info|xyz|online|site|top|live|link|me|co)\/[^\s<>"']*/gi;
+// Free hosting and tunnels where anyone can put up a fake page in minutes.
+const FREE_HOSTS = /(^|\.)(web\.app|firebaseapp\.com|netlify\.app|vercel\.app|github\.io|pages\.dev|glitch\.me|blogspot\.com|wixsite\.com|weebly\.com|000webhostapp\.com|ngrok(-free)?\.(io|app)|trycloudflare\.com|sites\.google\.com|forms\.gle)$/i;
+const RELIEF_WORDS = /(relief|rescue|flood|ndrf|sdrf|govt|government|cm-?fund|donat)/i;
 const SHORTENERS = /^(bit\.ly|tinyurl\.com|goo\.gl|is\.gd|cutt\.ly|rb\.gy|shorturl\.at|t\.ly|ow\.ly|tiny\.cc)$/i;
 const TRUSTED = /(^|\.)(gov\.in|nic\.in|tn\.gov\.in|ndma\.gov\.in|chennaicorporation\.gov\.in|t\.co|twitter\.com|x\.com|google\.com|maps\.app\.goo\.gl|youtube\.com|youtu\.be)$/i;
 const LOOKALIKE = /(gov[-_.]?in(?!$)|govt?-?tn|ndrf-|rescue-?(?:fund|pay)|relief-?(?:fund|pay)|cmprf(?!\.tn\.gov\.in))/i;
@@ -20,7 +27,7 @@ const LOOKALIKE = /(gov[-_.]?in(?!$)|govt?-?tn|ndrf-|rescue-?(?:fund|pay)|relief
 export function scamCheck(text) {
   const t = String(text || '');
   const reasons = [];
-  if (MONEY.test(t)) reasons.push('asks for money or bank / UPI details');
+  if (MONEY.test(t) || MONEY_TA.test(t) || MONEY_WORDS.test(t)) reasons.push('asks for money or bank / UPI details');
   if (SECRET.test(t)) reasons.push('asks for an OTP, PIN or password');
   for (const raw of t.match(URL_RE) || []) {
     let host = '';
@@ -30,6 +37,8 @@ export function scamCheck(text) {
     else if (SHORTENERS.test(host)) reasons.push(`shortened link that hides where it goes (${host})`);
     else if (/\.apk(\?|$)/i.test(raw)) reasons.push('link to an app file (.apk) to install');
     else if (LOOKALIKE.test(host) && !TRUSTED.test(host)) reasons.push(`link that imitates an official site (${host})`);
+    else if (RELIEF_WORDS.test(host) && !TRUSTED.test(host)) reasons.push(`relief / rescue site that is not a government site (${host})`);
+    else if (FREE_HOSTS.test(host) && !TRUSTED.test(host)) reasons.push(`page on free hosting that anyone can set up (${host})`);
     else if (raw.startsWith('http://') && !TRUSTED.test(host)) reasons.push(`link without https (${host})`);
   }
   const high = reasons.some((r) => /money|OTP/.test(r));

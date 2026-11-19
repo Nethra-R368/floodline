@@ -2,7 +2,7 @@ import { generateNight, simulate, evaluateExtraction, evaluateDedupe, DEFAULT_SI
 import { extractRules } from './core/extract.js';
 import { HARD_SET, scoreHardSet } from './core/hardset.js';
 import { REAL_SET } from './core/realset.js';
-import { MEASURED_REAL } from './core/measured.js';
+import { scoreRecorded } from './core/evaluate.js';
 import { fmtMinutes } from './core/priority.js';
 import { isConfigured, readMessages } from './ai.js';
 import { $, esc } from './util.js';
@@ -127,8 +127,8 @@ export function initBench({ getAi }) {
     const dd = evaluateDedupe(night);
     const fields = [['kind', 'Type of message (request, update, offer, other)'], ['area', 'Area (when it is one of the 28 known localities)'], ['phones', 'Phone numbers'], ['people', 'Number of people'], ['vulnerable', 'Who is vulnerable'], ['water', 'Water level']];
     const cell = (v) => (v == null ? '—' : `${v}%`);
-    const cloud = aiReal.cloud || MEASURED_REAL.cloud;
-    const device = aiReal.device || MEASURED_REAL.device;
+    const cloud = aiReal.cloud || scoreRecorded('cloud');
+    const device = aiReal.device || scoreRecorded('device');
     const col = (r, k) => (r ? cell(k === 'overall' ? r.overall : r.fields[k]) : '<span class="muted">not measured</span>');
     const known = REAL_SET.filter((x) => x.areaId).length;
     $('realAccuracy').innerHTML = `<table class="cmp"><thead><tr><th>Field</th><th>Rules (offline)</th><th>Gemini in the cloud + checks</th><th>Gemini Nano on this device + checks</th></tr></thead><tbody>

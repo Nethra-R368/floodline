@@ -556,11 +556,25 @@ async function startSharing(code) {
     $('shareCode').value = c;
     $('shareChip').classList.remove('hidden');
     $('shareLeave').classList.remove('hidden');
+    $('shareRotate').classList.remove('hidden');
     await pushEvents(W.events); // share what is already on this board
   } catch (err) { shareSay(err.message, true); }
 }
 $('shareCreate').addEventListener('click', () => startSharing(newGroupCode()));
 $('shareJoin').addEventListener('click', () => startSharing($('shareCode').value));
+$('shareRotate').addEventListener('click', async () => {
+  if (!sharedCode()) return;
+  if (!confirm('Move this board to a new group code? Everyone who should keep seeing it will need the new code.')) return;
+  await startSharing(newGroupCode());
+  shareSay(`Moved to a new code: ${sharedCode()}. Read it out to the volunteers who should stay; the old code gets no new updates.`);
+});
+$('forgetBoard').addEventListener('click', () => {
+  if (!confirm('Delete the live board and the group code from this device? Other volunteers keep their copies.')) return;
+  leaveBoard(); store.remove('floodline.shareCode'); store.remove('floodline.ws.live');
+  if (ws === 'live') { W = { events: [], clock: 0, cursor: 0, boats: null }; render(); }
+  $('shareChip').classList.add('hidden'); $('shareLeave').classList.add('hidden'); $('shareRotate').classList.add('hidden');
+  shareSay('This device no longer has the live board or the code.');
+});
 $('shareLeave').addEventListener('click', () => {
   leaveBoard(); store.remove('floodline.shareCode');
   $('shareChip').classList.add('hidden'); $('shareLeave').classList.add('hidden');

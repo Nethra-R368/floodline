@@ -80,8 +80,9 @@ export function buildState(events, now) {
     if (reshared) flags.push('reshared');
     if (saysSafe) flags.push('says-safe');
     if ((status === 'claimed' || status === 'enroute') && claimers.size > 1) flags.push('double-claim');
-    // Every report of this household was read as "not a request" by the AI: keep it, but a person must check.
-    const aiDoubt = c.reports.every((r) => r.x.aiKind);
+    // Most reports of this group were read as "not a request" by the AI (e.g. a helpline number shared again and
+    // again): keep it, at the bottom, for a person to check.
+    const aiDoubt = c.reports.filter((r) => r.x.aiKind).length * 2 > c.reports.length;
     if (aiDoubt) flags.push('ai-doubt');
     // How precise is the location? exact = a door / flat number and street; street = a street or landmark; locality = area only.
     const addr = String(c.address || '');

@@ -32,6 +32,9 @@ def is_name(cand):
     ws = [w.strip('.').lower() for w in cand.split()]
     return ws and all(w not in PLACES and w not in STOP and len(w) > 1 for w in ws) and not any(w.isdigit() for w in ws)
 
+EXTRA_NAMES = ['Arpan Shukla', 'Donato Jenda', 'Mohammed Khaja', 'Ananthakrishnan', 'Fedrick', 'Shanthi', 'Deepti', 'Sachina Garg', 'Sachina',
+               'Balasubramaniam', 'Gajendran', 'Muthuselval', 'Samidurai', 'Suganya', 'Shobana', 'Karthi', 'Saravanbhavan', 'Abinash Ramamoorthy',
+               'Abinash', 'Florina', 'Lakshmi C Marar', 'Madura Ganesh', 'Kushal Bajaj', 'Vikram', 'Anushree', 'Navaneetha', 'Poovazhagi', 'Aysha']
 PSEUDO = ['Ravi', 'Priya', 'Arjun', 'Meena', 'Karthik', 'Divya', 'Suresh', 'Lakshmi', 'Vijay', 'Anitha', 'Ganesh', 'Kavya', 'Mohan', 'Revathi', 'Bala',
           'Sangeetha', 'Senthil', 'Uma', 'Prakash', 'Nisha', 'Kumar', 'Deepa', 'Siva', 'Janani', 'Arun', 'Keerthi', 'Raja', 'Sowmya', 'Dinesh', 'Malar']
 names_seen = collections.Counter()
@@ -59,13 +62,15 @@ def anon(t):
     t = re.sub(r'(?<![\d])\d{6,9}(?![\d])', lambda m: fake_phone(m.group(0)) if not re.fullmatch(r'6\d{5}', m.group(0)) else m.group(0), t)  # landline groups (keep 6-digit pincodes)
     t = re.sub(r'(\d{5} ?\d{5})(\s*[-–:(]\s*)([a-z][a-z]{2,}(?:\s+[a-z]{3,})?)', lambda m: m.group(1) + m.group(2) + (pseudo(m.group(3)) if is_name(m.group(3)) else m.group(3)), t)
     t = re.sub(r'(?i)\b(stranded|stuck)\s+(' + NAME + r')\s*,', lambda m: m.group(1) + ' ' + (pseudo(m.group(2)) if is_name(m.group(2)) else m.group(2)) + ',', t)
+    # names found by reading the output (people, not places): always replaced
+    for nm in EXTRA_NAMES: t = re.sub(r"\b" + re.escape(nm) + r"\b", lambda m: pseudo(m.group(0)), t, flags=re.I)
     # names after cue words, and names right before a phone number
     t = re.sub(r'(?i:\b(?:contact|cont|call|reach|mr\.?|mrs\.?|ms\.?|dr\.?|commander|cmdr|cr\.?)\b)(\s*[:\-–]?\s*)(' + NAME + ')',
                lambda m: m.group(0).replace(m.group(2), pseudo(m.group(2))) if is_name(m.group(2)) else m.group(0), t)
     t = re.sub('(' + NAME + r')(\s*[-–:(]?\s*)(?=' + PHONE + ')',
                lambda m: pseudo(m.group(1)) + m.group(2) if is_name(m.group(1)) else m.group(0), t)
     # door / flat numbers
-    t = re.sub(r'(?i)\b(no[.:]?|flat\s*no[.:]?|door\s*no[.:]?|plot\s*no[.:]?|fl\s*no|flno|#)\s*(\d{1,5}[a-z]?(?:[/-]\d{1,5}[a-z]?)?)(?![\d])',  # short door numbers only, never a phone number
+    t = re.sub(r'(?i)\b(no[.:]?|flat\s*no[.:]?|door\s*no[.:]?|plot\s*no[.:]?|fl\s*no|flno|#)\s*(\d{1,5}[a-z]?(?:[/-]\d{1,5}[a-z]?)?)(?![\d])(?![ -]?\d)',  # short door numbers only, never (half of) a phone number
                lambda m: m.group(1) + ' ' + re.sub(r'\d', lambda d: h(m.group(2), 9)[len(d.string[:d.start()]) % 9], m.group(2)), t)
     t = re.sub(r'\b(\d{1,4}[a-zA-Z]?[/-]\d{1,4}[a-zA-Z]?)\b', lambda m: re.sub(r'\d', lambda d: h(m.group(1), 9)[d.start() % 9], m.group(1)), t)
     t = re.sub(r'\b(\d{1,4})(,?\s+)(?=(?:[A-Za-z]+\s){0,3}' + STREETW + ')', lambda m: h(m.group(1), len(m.group(1))).lstrip('0').rjust(len(m.group(1)), '1') + m.group(2), t, flags=re.I)

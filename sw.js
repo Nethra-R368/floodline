@@ -1,11 +1,11 @@
 // Keeps FloodLine usable with no internet: after one visit, the app, its libraries, fonts and
 // any map tiles already seen are served from the device. AI calls to the cloud are never cached.
-const CACHE = 'floodline-v9';
+const CACHE = 'floodline-v10';
 const SHELL = [
   './', 'index.html', 'manifest.webmanifest', 'css/style.css', 'icon.svg',
   'js/app.js', 'js/bench.js', 'js/map.js', 'js/util.js', 'js/ai.js', 'js/firebase-config.js',
   'js/core/dedupe.js', 'js/core/extract.js', 'js/core/gazetteer.js', 'js/core/hardset.js', 'js/core/input.js',
-  'js/core/priority.js', 'js/core/prompt.js', 'js/core/realset.js', 'js/core/realstream.js', 'js/core/realstream_ai.js', 'js/core/security.js', 'js/firebase.js', 'js/sync.js', 'js/core/sim.js', 'js/core/store.js', 'js/core/measured.js', 'js/case.js',
+  'js/core/priority.js', 'js/core/prompt.js', 'js/core/realset.js', 'js/core/realstream.js', 'js/core/realstream_ai.js', 'js/core/security.js', 'js/firebase.js', 'js/sync.js', 'js/core/sim.js', 'js/core/store.js', 'js/core/measured.js', 'js/core/evaluate.js', 'js/case.js', 'js/label.js', 'label.html',
 ];
 const CACHEABLE_HOSTS = ['cdnjs.cloudflare.com', 'www.gstatic.com', 'fonts.googleapis.com', 'fonts.gstatic.com', 'tile.openstreetmap.org'];
 

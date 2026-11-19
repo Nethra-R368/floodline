@@ -25,6 +25,7 @@ async function sdk() {
 /** Join (or create) the shared board for a group code. onEvents(events) gets decrypted events from every volunteer. */
 export async function joinBoard(code, onEvents, onStatus = () => {}) {
   leaveBoard();
+  sent.clear(); // "already sent" is per board: moving to a new code must copy everything again
   const keys = await boardKeys(code);
   await sdk();
   current = keys;

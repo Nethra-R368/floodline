@@ -1,43 +1,71 @@
-# How FloodLine works (for judge questions)
+# How FloodLine works
 
-## Pipeline for one pasted message
+A static web app (no build step) served from GitHub Pages. Everything runs in the browser; Firebase is used for the cloud AI (Firebase AI Logic) and, if a group chooses, for sharing one encrypted board across devices (Auth + Firestore).
 
-| Step | Function (file) | What happens |
+## Pipeline for one message
+
+| Step | Code | What happens |
 |---|---|---|
-| 1 | `splitMessages` (core/input.js) | Paste → separate messages. Understands WhatsApp "Export chat" lines or blank-line separation. |
-| 2 | `extractRules` (core/extract.js) | Instant, offline: kind (request / update / offer / noise), Indian mobile numbers, area (28 Chennai localities, English + Tanglish + Tamil script spellings), street/door, people count, vulnerable (pregnant, medical, infant, elderly, disabled), water level, needs, trapped. |
-| 3 | `report` event (core/store.js) | Message + extraction appended to the event log; the case appears immediately. |
-| 4 | `readMessages` (ai.js) + `guardAi` (core/prompt.js) | Optional. Gemini re-reads messages through Firebase AI Logic: Gemini Nano on the device when available (batches of 5, works offline), Gemini in the cloud otherwise (batches of 10, with App Check). Output is constrained to a JSON schema in both cases. Guardrails: phone kept only if its digits are in the message; area only if it is in the gazetteer; address only if ≥60% of its words are in the message; contact name only if written; vulnerable flags are the union of rules + AI (missing a pregnant woman costs more than an extra flag). Result is an `extract` event. |
-| 5 | `clusterReports` (core/dedupe.js) | Union-find over reports: same phone → merge; same area + street/door tokens (Jaccard ≥ 0.6, different door numbers never merge) → merge; same name + street → merge. Case id = earliest report, so ids stay stable as cases grow. |
-| 6 | `scoreCase` (core/priority.js) | Points with labels: pregnant 40, medical 40, infant 25, elderly 20, disabled 20, neck water 35, terrace 20, waist 15, trapped 10, 3/person (max 15), +1 per 10 min unassigned (max 30), +3 per extra report (max 9), supplies-only −15. Tiers: critical ≥70, high ≥45, medium ≥25. |
-| 7 | `buildState` (core/store.js) | Applies claim/status events; flags: **stale** (unclaimed 45 min), **check** (claimed, no update 90 min), **says-safe** (an update message matches the household), **reshared** (reports after rescue). |
+| 1 | `splitMessages` (`js/core/input.js`) | Paste → separate messages (WhatsApp "Export chat" lines or blank lines). |
+| 2 | `extractRules` (`js/core/extract.js`) | Offline, instant: kind (request / update / offer / noise), Indian mobile numbers (with +91 / 0 prefixes), area (54 Chennai localities, English / Tanglish / Tamil spellings), street and door, people, vulnerable (pregnant, medical, infant, elderly, disabled), water level, needs. |
+| 3 | `report` event (`js/core/store.js`) | Message + extraction appended to the event log; the request appears at once. |
+| 4 | `readMessages` (`js/ai.js`) | Optional. Firebase AI Logic `getGenerativeModel` with `InferenceMode.PREFER_ON_DEVICE` (or on-device only / cloud only from Settings): Gemini Nano when `LanguageModel.availability()` is "available" within 2.5 s, otherwise Gemini in the cloud (3.6 Flash → 3.5 Flash → 3.1 Flash-Lite, a model is skipped for 10 min after a quota error). One JSON schema both ways (`responseSchema` / `responseConstraint`). The model and `inferenceSource` are recorded. |
+| 5 | `guardAi` (`js/core/prompt.js`) | Checks every AI answer against the message: a phone must be in the message (a landline the AI lists is set aside, an invented number is blocked); the area must be a known locality; an address must be ≥60% words from the message; a name must be in the message. **If the rules read a request and the AI disagrees, it stays a request** (`aiKind` records what the AI thought). On the device (Gemini Nano), water level and vulnerability only fill gaps the rules left. Vulnerable flags are the union of rules and AI. Result: an `extract` event. |
+| 6 | `clusterReports` (`js/core/dedupe.js`) | Union-find: same phone → same group; same area + street/door tokens (Jaccard ≥ 0.6, different door numbers never merge); same name + street. Each group says why it was merged. |
+| 7 | `scoreCase` (`js/core/priority.js`) | Points with labels (pregnant 40, medical 40, infant 25, elderly 20, disabled 20, neck water 35, terrace 20, waist 15, trapped 10, 3/person up to 15, +1 per 10 min unassigned up to 30, +3 per extra report up to 9, supplies-only −15). Time-critical (pregnant, medical, infant, neck-deep water) is raised to at least 70 = "critical". The order is advice for the volunteer. |
+| 8 | `buildState` (`js/core/store.js`) | Applies `claim` / `status` / `verify` events. Flags: stale (unclaimed 45 min), check (no update 90 min), says-safe, reshared, **double-claim** (two volunteers took it), **ai-doubt** (most of its posts look like a helpline to the AI — kept, sorted to the bottom). Location precision: exact (door no. + street) / street / locality / unknown, and whether the address was confirmed. |
 
-## Why an event log?
+## Events and sync
 
-Every action (`report`, `extract`, `claim`, `status`) is an immutable event with an id and time. The board is rebuilt from the log, so:
-- **sync is simple**: volunteers exchange events (`mergeEvents` de-duplicates by id). Today that's `BroadcastChannel` between windows on one device plus export/import; a tiny backend (e.g. Firebase) would carry the same events across phones;
-- **nothing is lost or overwritten**: full audit trail for the after-action review;
-- **testable**: `buildState(events, now)` is a pure function.
+Every action is an immutable event with an id and time (`report`, `extract`, `claim`, `status`, `verify`; actions carry the volunteer's name and a device id). The board is rebuilt from the log (`buildState(events, now)` is a pure function), so:
 
-## The benchmark (core/sim.js)
+- **Same device:** windows share events over `BroadcastChannel`.
+- **Across devices (optional):** `js/sync.js`. Volunteers enter the same group code (80 random bits). Each device derives `boardId = SHA-256("floodline-board:" + code)[0:32]` and `key = PBKDF2-SHA-256(code, salt = boardId, 310,000)` → AES-256-GCM. Every event is encrypted on the device and written to Firestore at `boards/{boardId}/events/{eventId}` after anonymous Firebase sign-in (App Check enforced); `onSnapshot` brings other volunteers' events, which are decrypted and merged by id. Offline writes queue in Firestore's local cache. `firestore.rules` allow only create (append-only), only with fields `c, iv, by, ts`, `by == auth.uid`, `ts == request.time`, size limits. "Move to a new group code" copies the board under a new key; "Forget" wipes it from the device.
+- **Handover file:** download the log, optionally locked with a passphrase (AES-256-GCM, PBKDF2 310,000, random salt and IV). An unlocked file carries a SHA-256 hash-chain fingerprint, which detects accidental changes only.
 
-`generateNight(seed)` creates households with known truth (area, street, phone, people, vulnerable, water, start time, maybe self-rescue) and writes their messages: a first post in English / Tanglish / Tamil, then re-posts by relatives (forwards, "still no help", a relative's own number, no number), "we are safe now" updates, boat/food offers and chatter.
+What the server sees on a shared board: ciphertext, the board id, event ids (they encode a time), server timestamps and anonymous user ids. With cloud AI on, message text goes to the Gemini API in plain text.
 
-`simulate(night, strategy)` runs 12 hours minute by minute with the same boats:
-- **manual**: N volunteers read the chat in order, each message takes M minutes; unread messages older than 120 min are lost in the scroll; a repost is recognised 40% of the time; obviously critical messages jump the queue half the time; boats go in queue order.
-- **floodline**: messages arrive within 5 min; the real `extractRules` + clusterer run; a free boat takes the highest-scoring open case; cases whose family says they're safe are skipped.
-- Boat round trip = 20 min + 10 min/km from the nearest of 4 depots. Arriving after the family was rescued (or got out) = wasted trip.
+## The 2015 data (`scripts/`)
 
-`evaluateExtraction` / `evaluateDedupe` score the extractor against the generated truth; `scoreHardSet` scores any extractor (rules or Gemini) on 30 hand-labelled hard messages.
+1. `1_extract_candidates.py` — reads the RDF files of the CC0 archive, de-duplicates texts (34,717), keeps posts that mention being stuck / rescue / water / a vulnerable person **and** contain a phone number, and are not obvious offers (593).
+2. `2_build_stream.py` — anonymises (phone numbers → made-up numbers in the same format, same input → same output; @handles, links, door numbers, names next to numbers or after contact / call / Dr / Mr, and a listed set of names) and keeps the real times → `js/core/realstream.js` (520 after removing identical copies).
+3. `3_build_labelled_60.py` — random sample of 60 (seed 2015), anonymised with hand-written replacements, with the labels → `js/core/realset.js`.
+4. Gemini's raw answers are recorded from the live app (`js/core/realstream_ai.js`, `js/core/measured.js`); `js/core/evaluate.js` scores them with the current checks.
 
-## Likely questions
+## Reproduce the numbers
 
-| Q | A |
+```bash
+node --test test/core.test.mjs
+
+# accuracy on the 60 real posts (rules live; AI from recorded raw answers)
+node --input-type=module -e "
+import { scoreRules, scoreRecorded } from './js/core/evaluate.js';
+console.log('rules', scoreRules().overall);
+for (const w of ['cloud','device']) { const s = scoreRecorded(w); console.log(w, s.model, s.overall, 'own reading', s.own.overall, 'invented', s.invented); }"
+
+# the replay
+node --input-type=module -e "
+import { REAL_STREAM } from './js/core/realstream.js'; import { STREAM_AI } from './js/core/realstream_ai.js';
+import { extractRules } from './js/core/extract.js'; import { guardAi } from './js/core/prompt.js'; import { buildState } from './js/core/store.js';
+const evs = REAL_STREAM.map((m,i)=>({t:'report',id:'R'+i,at:m.at,text:m.text,x:guardAi(STREAM_AI[i],m.text,extractRules(m.text),'cloud')}));
+const st = buildState(evs, Math.ceil(REAL_STREAM.at(-1).at)+10); const clear = st.cases.filter(c=>!c.flags.includes('ai-doubt'));
+console.log('requests', clear.length, 'critical', clear.filter(c=>c.tier==='critical').length, 'check groups', st.cases.length-clear.length);"
+
+# the simulation
+node --input-type=module -e "
+import { generateNight, simulate } from './js/core/sim.js';
+const P={boats:10,volunteers:3,minutesPerMessage:2.5,manualRepeatCatch:0.4};
+let m=0,f=0; for (let s=1;s<=20;s++){ const n=generateNight({seed:s*101,households:110}); m+=simulate(n,'manual',P).neverReached; f+=simulate(n,'floodline',P).neverReached; } console.log(m/20, f/20);"
+```
+
+Re-recording the AI answers needs the live site (App Check) — Results page → "Run Gemini on the real messages"; for Gemini Nano, desktop Chrome with the Prompt API and the model downloaded. Re-running `scripts/` needs the RDF files from the archive.
+
+## What is real and what is simulated
+
+| Real (verified) | Simulated or recorded |
 |---|---|
-| Isn't this just AI translating messages? | No. Reading is step 2 of 7. The value is the shared state: merge repeats, rank with reasons, track ownership, flag what's forgotten, close the loop. It works with no AI at all. |
-| What if the AI invents a phone number? | It is blocked: every AI phone must appear in the message digits (unit-tested). The board shows "Not used: phone … not in the message". |
-| What if there's no internet for AI? | Rules work offline; AI only improves extractions later. |
-| Is the benchmark rigged? | All assumptions are editable in the Results page; the 20-night table shows where FloodLine is worse (median wait for low-risk families). The extractor is not tuned on the hard set; on it rules score 90.3% and only 37.5% on people counts. |
-| Why rules and AI, not just AI? | Speed (instant), offline, cost, and a check on the AI. |
-| Privacy? | No FloodLine server. Data stays in the volunteer's browser; with Gemini on, message text goes to Google's API only. Demo data is fictional. |
-| What's next? | Cross-device sync server; SMS gateway intake for areas without data; street-level geocoding; Tamil voice-note transcription; a pilot with a volunteer group during the monsoon. |
+| Reading, grouping, ranking, tracking on pasted messages | The Results-page boat comparison (`js/core/sim.js`) |
+| Cloud Gemini through Firebase AI Logic + App Check | "10 simulated boat teams" on the practice board |
+| Gemini Nano on the device, offline (tested on one laptop) | The 2015 replay uses *recorded* AI answers |
+| Offline app (service worker) | No real rescue outcomes; no deployment yet |
+| Encrypted shared board (tested with two browsers) | Locations are area centres unless an address is given |

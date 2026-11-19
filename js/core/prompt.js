@@ -89,7 +89,10 @@ export function guardAi(item, text, rules = extractRules(text), where = 'cloud')
 
   const aiPhones = asArr(ai.phones).map((p) => String(p).replace(/\D/g, '').slice(-10)).filter((p) => p.length === 10);
   const okPhones = aiPhones.filter((p) => phoneInText(p, text));
-  aiPhones.filter((p) => !okPhones.includes(p)).forEach((p) => guard.push(`Blocked phone ${p}: not in the message`));
+  const digits = String(text).replace(/\D/g, '');
+  aiPhones.filter((p) => !okPhones.includes(p)).forEach((p) => guard.push(digits.includes(p)
+    ? `Ignored phone ${p}: it's in the message but is a landline or not a mobile number`
+    : `Blocked phone ${p}: not in the message`));
   const phones = [...new Set([...rules.phones, ...okPhones])];
 
   let areaId = rules.areaId;

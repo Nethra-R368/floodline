@@ -281,6 +281,7 @@ test('on-device (Gemini Nano) answers only fill gaps for water and vulnerable', 
 // ---------- security ----------
 import { scamCheck, maskPhone, maskText, chainHead, fingerprint, sealBoard, openBoard, verifyPlain } from '../js/core/security.js';
 import { REAL_SET } from '../js/core/realset.js';
+import { REAL_STREAM as REAL_STREAM_FOR_TEST } from '../js/core/realstream.js';
 
 test('scam check flags money / OTP asks and disguised links, never a real 2015 rescue request', () => {
   assert.equal(scamCheck('Boat rescue team ready for Velachery. Pay Rs 500 registration fee to UPI rescue@okaxis first').level, 'high');
@@ -399,4 +400,14 @@ test('location precision is shown, and an address can be confirmed', () => {
   const a = st.cases.find((c) => c.id === 'a'), b = st.cases.find((c) => c.id === 'b');
   assert.equal(a.loc, 'locality'); assert.equal(a.locVerified, true);
   assert.equal(b.loc, 'exact'); assert.equal(b.locVerified, false);
+});
+
+test('scam check: Tamil money asks, amounts in words, look-alike relief sites, free hosting', () => {
+  assert.equal(scamCheck('படகு வேண்டுமா? 500 ரூபாய் அனுப்புங்கள் 9840012345').level, 'high');
+  assert.equal(scamCheck('Boat available, pay five hundred to 9840012345 first').level, 'high');
+  assert.equal(scamCheck('Relief kit: register at tn-relief.in/form').level, 'check');
+  assert.equal(scamCheck('Click https://rescue-chennai.web.app to book a boat').level, 'check');
+  assert.equal(scamCheck('Govt order: https://www.tn.gov.in/flood').level, null);
+  assert.equal(scamCheck('pregnant lady, 3 people, 1000 litres of water entered, 9840012345').level, null);
+  assert.deepEqual(REAL_STREAM_FOR_TEST.filter((m) => scamCheck(m.text).level), []);
 });

@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'; object-src 'none'; base-uri 'self'" />
+  <title>FloodLine · label the real posts</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    .lab { max-width: 860px; margin: 0 auto; padding: 18px; }
+    .post { border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; margin: 14px 0; background: var(--card, transparent); }
+    .post .t { font-size: 1.02rem; margin-bottom: 10px; }
+    .post fieldset { border: 0; padding: 0; margin: 6px 0; display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; }
+    .post legend { font-weight: 600; margin-right: 8px; float: left; }
+    .post label { font-weight: 400; display: inline-flex; gap: 4px; align-items: center; }
+    .done { border-color: var(--green); }
+    .bar { position: sticky; top: 0; background: var(--bg, #f3f2ee); padding: 10px 0; border-bottom: 1px solid var(--line); z-index: 2; }
+  </style>
+</head>
+<body>
+  <div class="lab">
+    <div class="bar"><b>Label the 60 real posts</b> · <span id="count">0</span> / 60 done · <button id="export" class="btn dark" type="button">Download my labels</button></div>
+    <p class="note">Read each real post from the 2015 Chennai floods and answer as a volunteer would. Your answers are saved in this browser as you go. You don't see anyone else's labels — that's the point: afterwards we compare yours with the ones the AI assistant made and report how often they agree.</p>
+    <div id="list"></div>
+  </div>
+  <script type="module" src="js/label.js"></script>
+</body>
+</html>
