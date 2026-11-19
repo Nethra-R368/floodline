@@ -1,6 +1,6 @@
 // Keeps FloodLine usable with no internet: after one visit, the app, its libraries, fonts and
 // any map tiles already seen are served from the device. AI calls to the cloud are never cached.
-const CACHE = 'floodline-v10';
+const CACHE = 'floodline-v11';
 const SHELL = [
   './', 'index.html', 'manifest.webmanifest', 'css/style.css', 'icon.svg',
   'js/app.js', 'js/bench.js', 'js/map.js', 'js/util.js', 'js/ai.js', 'js/firebase-config.js',
