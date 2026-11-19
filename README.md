@@ -1,18 +1,24 @@
 # FloodLine
 
-A rescue request tracker for volunteer groups during Chennai floods.
+[![tests](https://github.com/Nethra-R368/floodline/actions/workflows/test.yml/badge.svg)](https://github.com/Nethra-R368/floodline/actions/workflows/test.yml) · MIT · no build step · **Live: https://nethra-r368.github.io/floodline/**
 
-Volunteers paste the rescue requests that arrive on WhatsApp, X and SMS. FloodLine reads them (English, Tamil or Tanglish), groups repeats of the same household, puts the most urgent at the top with the reasons written out, and keeps each request on the list until someone marks the family as rescued.
+A rescue board for volunteer groups during Chennai floods. Volunteers paste the requests that pour in on WhatsApp, X and SMS; FloodLine reads them (English, Tamil, Tanglish), groups repeats of the same family, puts the most urgent at the top with the reasons written out, keeps every request on the list until someone marks the family rescued — and keeps working when the network doesn't.
 
-Demo video (2:45, hybrid AI: Gemini Nano on the device, offline): https://youtu.be/2TtRTdWzyA0
+**Tested on the real 2015 Chennai flood.** 520 real rescue posts from the night of 2–3 December 2015, replayed at the minute they were posted and read by Gemini through Firebase AI Logic: 229 households, 99 repeat posts merged (one pregnant woman was posted 12 times), 138 helpline posts kept off the list, 65 critical households first, 103 made-up AI details caught. On 60 of those posts labelled by hand, cloud Gemini with FloodLine's checks reads **94.7%** of the details right. Open the site — it starts on that replay.
 
-[![FloodLine hybrid AI demo video](https://img.youtube.com/vi/2TtRTdWzyA0/hqdefault.jpg)](https://youtu.be/2TtRTdWzyA0)
+- **Hybrid AI:** Gemini Nano on the device when Chrome has it (works with no internet), Gemini in the cloud otherwise — both through Firebase AI Logic, both checked against the message.
+- **Security:** scam and phishing flags, one board shared across phones with end-to-end encryption (Firestore only ever holds ciphertext, append-only rules), locked shift handover, tamper-evident fingerprint, privacy mode, App Check, CSP + SRI. See the Security tab.
+- **29 unit tests**, run on every push.
 
-Longer walkthrough (5 min): https://youtu.be/dKdgLOt9mkk
+Demo video: https://youtu.be/2TtRTdWzyA0 · longer walkthrough: https://youtu.be/dKdgLOt9mkk
 
-Live: https://nethra-r368.github.io/floodline/ — it opens on a practice board with a simulated night. Press "Start the night". Every name and phone number on the practice board is made up.
-
-![The request board during a practice night](docs/screenshots/board.jpg)
+| The real 2015 night, replayed | One family, posted 12 times |
+|---|---|
+| ![Board after replaying 520 real posts](docs/screenshots/board.jpg) | ![The Mudichur request, reported 12 times](docs/screenshots/request.jpg) |
+| **Real flood test** | **How well it understood** |
+| ![Real flood test page](docs/screenshots/case.jpg) | ![Accuracy on 60 hand-labelled real posts](docs/screenshots/accuracy.jpg) |
+| **Security** | **Phone** |
+| ![Security page](docs/screenshots/security.jpg) | ![Phone layout](docs/screenshots/phone.jpg) |
 
 ## Why
 
@@ -31,12 +37,8 @@ This has been tried before: in the 2018 Kerala floods, volunteers built keralare
 - **Groups repeats.** Messages with the same phone number, or the same door number and street in the same area, become one request. It says why they were grouped.
 - **Orders by urgency, with points you can see.** Pregnant or in labour +40, medical +40, neck-deep water +35, baby +25, elderly +20, cannot walk +20, on a terrace +20, plus time waiting and number of reports. A household that is time-critical (pregnant or in labour, medical, baby, neck-deep water) is never shown below critical.
 - **Keeps track.** A request nobody takes for 45 minutes is marked. A taken request with no update for 90 minutes is marked. A later "we are safe" message, or people still sharing after a rescue, is marked too, with a reply in Tamil and English that volunteers can copy.
-- **Works as a team.** Every action is saved as an event. Boards update instantly across windows on the same device, and the whole board can be downloaded and loaded on another device for a shift handover.
+- **Works as a team.** Every action is saved as an event. With a group code, one board is shared across every volunteer's phone (end-to-end encrypted); a shift can also hand the whole board over as a locked file.
 - Map of requests (OpenStreetMap), call and WhatsApp buttons, a Tamil + English message asking the family if they still need help, phone layout, dark mode. The helpline numbers (112, 1070, 1077, 1913) are always shown at the top.
-
-| Request details | Results page | Phone |
-|---|---|---|
-| ![Request](docs/screenshots/request.jpg) | ![Results](docs/screenshots/results.jpg) | ![Phone](docs/screenshots/phone.jpg) |
 
 ## Works when the network doesn't
 
@@ -85,11 +87,11 @@ The median waits are slightly longer with FloodLine. Two reasons: the medians on
 
 The **Real flood test** tab and the **Real replay: Chennai, 2 Dec 2015** board play every rescue-related post with a phone number from the archive below — **520 real posts** from 19:43 on 2 December to 12:30 on 3 December 2015 — in the order and at the minute they were posted, anonymised (`js/core/realstream.js`). Read by Gemini in the cloud through Firebase AI Logic and checked by FloodLine (recorded in `js/core/realstream_ai.js`):
 
-- **231 households** needing help; **97 posts** were reposts of a family already on the board (a pregnant woman in Mudichur was posted 12 times, another in Velachery 8 times).
+- **229 households** needing help; **99 posts** were reposts of a family already on the board (a pregnant woman in Mudichur was posted 12 times, another in Velachery 8 times).
 - **138 helpline / offer posts** kept off the request list, so boats aren't sent to a helpline number.
-- **65 critical households** at the top: 18 pregnant or in labour, 23 with a baby, 12 needing medical care.
+- **65 critical households** at the top: 17 pregnant or in labour, 23 with a baby, 12 needing medical care.
 - **103 details** Gemini returned that the posts never said were dropped by the checks.
-- At 22:00 on 2 December a volunteer would already have had 95 households from 162 posts, 30 of them critical, in order.
+- At 22:00 on 2 December a volunteer would already have had 94 households from 162 posts, 30 of them critical, in order.
 
 The archive has the posts, not what happened next: this shows what FloodLine would have put in front of volunteers and in what order, not where boats actually went.
 
@@ -135,7 +137,7 @@ No build step and no server.
 
 ```bash
 python -m http.server 8000      # then open http://localhost:8000
-node --test test/core.test.mjs  # 28 unit tests
+node --test test/core.test.mjs  # 29 unit tests
 ```
 
 Cloud AI on localhost uses the same Firebase project (localhost is allowed in its App Check key). To use your own project, put its web config in `js/firebase-config.js`, turn on Firebase AI Logic with the Gemini Developer API, and register a reCAPTCHA Enterprise key in App Check.

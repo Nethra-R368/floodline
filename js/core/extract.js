@@ -9,7 +9,8 @@ export const WATER_LEVELS = ['knee', 'waist', 'neck', 'roof']; // roof = strande
 export const NEEDS = ['rescue', 'food', 'water', 'medicine'];
 export const KINDS = ['request', 'update', 'offer', 'noise'];
 
-const PHONE_RE = /(?<![\d])(?:\+?91[\s-]?)?([6-9]\d{4})[\s-]?(\d{5})(?![\d])/g;
+// Mobile numbers, with an optional +91 / 91 / 0 in front ("09840012345" is common in real posts).
+const PHONE_RE = /(?<![\d])(?:\+?91[\s-]?|0)?([6-9]\d{4})[\s-]?(\d{5})(?![\d])/g;
 
 /** All Indian mobile numbers in a text, as 10 digits. */
 export function findPhones(text) {

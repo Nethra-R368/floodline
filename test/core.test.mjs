@@ -368,3 +368,8 @@ test('shared board: same code gives same board and key; ciphertext hides the fam
   await assert.rejects(boardKeys('short'));
   assert.equal(normaliseCode('k7qm 2xda 9ptv c3hf'), 'K7QM-2XDA-9PTV-C3HF');
 });
+
+test('phone numbers written with a leading 0 are read (found in real 2015 posts)', () => {
+  assert.deepEqual(findPhones('Help needed, 7 people. Call 09835551810 / 09652654520'), ['9835551810', '9652654520']);
+  assert.deepEqual(findPhones('landline 04425619247'), []);
+});
