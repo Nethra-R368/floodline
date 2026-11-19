@@ -6,7 +6,7 @@ A rescue board for volunteer groups during Chennai floods. Volunteers paste the 
 
 **Status, honestly:** a working web app, tested by replaying 520 real posts from the 2015 Chennai flood and with unit tests. It has **not** been used by a rescue group in a real flood yet. Most of the code was written by an AI coding assistant (Claude Code) working from my direction, design decisions and testing; see [Who built what](#who-built-what).
 
-Demo video: https://youtu.be/2TtRTdWzyA0
+Demo video: https://youtu.be/lbxbXQ5wG_Q
 
 | The real 2015 night, replayed | One family, posted 12 times |
 |---|---|
