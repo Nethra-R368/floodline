@@ -40,7 +40,7 @@ export function buildState(events, now) {
   for (const e of events) {
     if (e.t === 'report') reports.push({ ...e });
     else if (e.t === 'extract') extractions.set(e.reportId, e.x);
-    else if (e.t === 'claim' || e.t === 'status') actions.push(e);
+    else if (e.t === 'claim' || e.t === 'status' || e.t === 'verify') actions.push(e);
   }
   for (const r of reports) if (extractions.has(r.id)) r.x = extractions.get(r.id);
 
@@ -52,16 +52,19 @@ export function buildState(events, now) {
   const cases = clusterReports(requests).map((c) => {
     const ids = new Set(c.reportIds);
     const mine = actions.filter((a) => ids.has(a.caseId)).sort((a, b) => a.at - b.at);
+    const locVerified = mine.some((a) => a.t === 'verify' && a.what === 'location');
     let status = 'new';
     let owner = null;
+    const claimers = new Set();
     let lastActionAt = null;
     let resolvedAt = null;
     const history = [];
     for (const a of mine) {
       lastActionAt = a.at;
       history.push(a);
-      if (a.t === 'claim') { owner = a.by; if (status === 'new') status = 'claimed'; }
-      else if (a.status === 'open') { status = owner ? 'claimed' : 'new'; resolvedAt = null; }
+      if (a.t === 'claim') { owner = a.by; claimers.add(a.by); if (status === 'new') status = 'claimed'; }
+      else if (a.t === 'verify') { /* handled below */ }
+      else if (a.status === 'open') { status = owner ? 'claimed' : 'new'; resolvedAt = null; claimers.clear(); if (owner) claimers.add(owner); }
       else { status = a.status; if (a.by && !owner) owner = a.by; resolvedAt = DONE.has(a.status) ? a.at : null; }
     }
     // Messages saying "we are safe now" for this household.
@@ -76,12 +79,19 @@ export function buildState(events, now) {
     if ((status === 'claimed' || status === 'enroute') && now - (lastActionAt ?? c.firstAt) >= STALE_ASSIGNED_MIN) flags.push('check');
     if (reshared) flags.push('reshared');
     if (saysSafe) flags.push('says-safe');
-    return { ...c, status, owner, lastActionAt, resolvedAt, history, safeReports, reshared, waiting, ...prio, flags };
+    if ((status === 'claimed' || status === 'enroute') && claimers.size > 1) flags.push('double-claim');
+    // Every report of this household was read as "not a request" by the AI: keep it, but a person must check.
+    const aiDoubt = c.reports.every((r) => r.x.aiKind);
+    if (aiDoubt) flags.push('ai-doubt');
+    // How precise is the location? exact = a door / flat number and street; street = a street or landmark; locality = area only.
+    const addr = String(c.address || '');
+    const loc = !c.areaId && !addr ? 'unknown' : /\d/.test(addr) && addr.split(/\s+/).length >= 2 ? 'exact' : addr ? 'street' : 'locality';
+    return { ...c, status, owner, claimers: [...claimers], lastActionAt, resolvedAt, history, safeReports, reshared, waiting, ...prio, flags, loc, locVerified };
   });
 
   const active = (c) => !DONE.has(c.status);
   // Order: open before closed; unassigned before taken; anyone still waiting before families who say they are safe; then points.
-  const safe = (c) => c.flags.includes('says-safe');
+  const safe = (c) => c.flags.includes('says-safe') || c.flags.includes('ai-doubt');
   cases.sort((a, b) => (active(b) - active(a)) || (b.status === 'new') - (a.status === 'new') || safe(a) - safe(b) || b.score - a.score || a.firstAt - b.firstAt);
 
   const open = cases.filter(active);
@@ -103,6 +113,7 @@ export function buildState(events, now) {
       stale: open.filter((c) => c.flags.includes('stale')).length,
       rescued: cases.filter((c) => c.status === 'rescued').length,
       offers: offers.length,
+      aiDoubt: open.filter((c) => c.flags.includes('ai-doubt')).length,
       noise: noise.length + updates.length,
     },
   };

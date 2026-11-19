@@ -57,7 +57,9 @@ async function generate(mode, prompt) {
   const live = CLOUD_MODELS.filter((m) => !(cooldown.get(m) > Date.now()));
   for (const name of live.length ? live : CLOUD_MODELS.slice(-1)) {
     try {
-      return await getModel(mode, name).generateContent(prompt);
+      const result = await getModel(mode, name).generateContent(prompt);
+      result.cloudModel = name;
+      return result;
     } catch (err) {
       last = err;
       const msg = String(err && err.message || err);
@@ -103,6 +105,7 @@ export async function readMessages(texts, mode = 'auto', onProgress = () => {}) 
   const size = onDevice ? BATCH.device : BATCH.cloud;
   const xs = [];
   const where = { device: 0, cloud: 0 };
+  const models = {};
   for (let i = 0; i < texts.length; i += size) {
     const chunk = texts.slice(i, i + size);
     let result;
@@ -118,8 +121,10 @@ export async function readMessages(texts, mode = 'auto', onProgress = () => {}) 
     const src = /on_device/i.test(result.response.inferenceSource || '') ? 'device' : 'cloud';
     const part = parseExtractReply(result.response.text(), chunk, src).map((x) => ({ ...x, where: src }));
     where[src] += part.length;
+    const label = src === 'device' ? 'gemini-nano (on device)' : result.cloudModel;
+    models[label] = (models[label] || 0) + part.length;
     xs.push(...part);
     onProgress(Math.min(texts.length, i + size), texts.length, src);
   }
-  return { xs, where };
+  return { xs, where, models };
 }

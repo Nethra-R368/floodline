@@ -1,4 +1,5 @@
 import { extractRules } from './core/extract.js';
+import { guardAi } from './core/prompt.js';
 import { buildState, mergeEvents, eventId, followUpText, alreadyRescuedText } from './core/store.js';
 import { fmtMinutes } from './core/priority.js';
 import { generateNight, tripMinutes } from './core/sim.js';
@@ -49,6 +50,7 @@ let night = null;
 const seenCases = new Set();
 let firstRender = true;
 const me = { name: store.get('floodline.me') || '' };
+const DEVICE = store.get('floodline.device') || (() => { const d = Array.from(crypto.getRandomValues(new Uint8Array(3)), (b) => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[b % 32]).join(''); store.set('floodline.device', d); return d; })();
 const ai = { mode: ['auto', 'device', 'cloud', 'off'].includes(store.get('floodline.aiMode')) ? store.get('floodline.aiMode') : 'auto', device: 'unsupported' };
 
 function loadWorkspace(name) {
@@ -132,7 +134,7 @@ function tick() {
     const m = msgs[W.cursor++];
     const rules = extractRules(m.text);
     const ai2015 = ws === 'r2015' ? STREAM_AI[Number(m.id.slice(1))] : null;
-    const x = ai2015 ? { ...rules, ...ai2015, areaId: ai2015.areaId || rules.areaId, phones: ai2015.phones && ai2015.phones.length ? ai2015.phones : rules.phones, source: 'ai' } : rules;
+    const x = ai2015 ? { ...guardAi(ai2015, m.text, rules, 'cloud'), where: 'cloud' } : rules; // recorded raw Gemini answer + today's checks
     evs.push({ t: 'report', id: `d${m.id}`, at: m.at, text: m.text, source: ws === 'r2015' ? 'X (Twitter), 2 Dec 2015 · real, anonymised' : 'WhatsApp group (simulated)', x });
   }
   if (evs.length) { W.events.push(...evs); send({ type: 'events', events: evs }); }
@@ -283,6 +285,9 @@ function warnings(c) {
   if (c.flags.includes('check')) out.push('<span class="warnline check">No update for 90 min</span>');
   if (c.flags.includes('says-safe')) out.push('<span class="warnline safe">Family says they are safe</span>');
   if (c.flags.includes('reshared')) out.push('<span class="warnline reshared">Still being shared</span>');
+  if (c.flags.includes('double-claim')) out.push(`<span class="warnline stale">Taken by ${c.claimers.length} people — agree who goes</span>`);
+  if (c.flags.includes('ai-doubt')) out.push('<span class="warnline check">AI: may be a helpline — check</span>');
+  if (!isDone(c) && !c.locVerified && (c.loc === 'locality' || c.loc === 'unknown')) out.push(`<span class="warnline loc">📍 ${c.loc === 'unknown' ? 'place unknown' : 'area only'} — confirm address</span>`);
   return out.join('');
 }
 
@@ -385,7 +390,8 @@ function renderDrawer() {
     + `<tr class="total"><td>Priority: ${PRIO[c.tier].toLowerCase()}</td><td>${total}</td></tr>`;
   const reports = c.reports.map((r) => `<div class="msg"><div class="meta">${fmtClock(r.at)} · ${esc(r.source || '')} · read by ${r.x.source !== 'ai' ? 'rules' : r.x.where === 'device' ? 'Gemini Nano on this device (checked)' : 'Gemini in the cloud (checked)'}</div>${esc(showText(r.text))}${(r.x.guard || []).filter((g) => /Blocked|Ignored/.test(g)).map((g) => `<div class="blocked">Not used: ${esc(g.replace(/^(Blocked|Ignored)\s*/, ''))}</div>`).join('')}</div>`).join('');
   const mergeWhy = [...new Set(c.merges.map((m) => m.why))];
-  const history = c.history.map((h) => `<li><span class="mono">${fmtClock(h.at)}</span>${esc(h.by || '')} ${h.t === 'claim' ? 'took this request' : `marked it “${STATUS[h.status] || 'reopened'}”`}${h.note ? ` — ${esc(h.note)}` : ''}</li>`).join('');
+  const history = c.history.map((h) => `<li><span class="mono">${fmtClock(h.at)}</span>${esc(h.by || '')}${h.dev ? ` <span class="muted mono">(device ${esc(h.dev)})</span>` : ''} ${h.t === 'claim' ? 'took this request' : h.t === 'verify' ? 'confirmed the address by phone' : `marked it “${STATUS[h.status] || 'reopened'}”`}${h.note ? ` — ${esc(h.note)}` : ''}</li>`).join('');
+  const LOC = { exact: 'door / flat number and street given', street: 'street or landmark given, no door number', locality: 'area only — the pin is the centre of the area', unknown: 'place not recognised' };
 
   els.drawer.innerHTML = `
     <button type="button" class="textbtn close">Close</button>
@@ -405,6 +411,7 @@ function renderDrawer() {
 
     <section><h3>Details</h3><dl class="kv">
       <dt>Area</dt><dd>${c.areaId ? esc(c.areaName) : 'not recognised'}</dd>
+      <dt>Location</dt><dd>${c.locVerified ? '<b style="color:var(--green)">address confirmed by phone</b>' : `${LOC[c.loc]}. <b>Confirm the address on a call before sending a boat.</b> <button type="button" class="textbtn" data-act="verify-loc">Address confirmed</button>`}</dd>
       <dt>Address</dt><dd>${esc(c.address || '—')}</dd>
       <dt>People</dt><dd>${c.people ?? 'not stated'}</dd>
       <dt>Vulnerable</dt><dd>${c.vulnerable.map((v) => VULN[v]).join(', ') || 'none mentioned'}</dd>
@@ -437,11 +444,23 @@ async function ensureName() {
 async function act(c, what) {
   if (!(await ensureName())) { toast('Add your name first, so others know who has it'); return; }
   const at = nowMin();
-  if (what === 'claim') addEvents([{ t: 'claim', id: eventId('c'), at, caseId: c.id, by: me.name }]);
-  else {
+  const who = { by: me.name, dev: DEVICE };
+  if (what === 'verify-loc') { addEvents([{ t: 'verify', id: eventId('v'), at, caseId: c.id, what: 'location', ...who }]); toast('Address marked as confirmed'); return; }
+  if (what === 'claim') {
+    if (c.status !== 'new' && c.owner && c.owner !== me.name && !confirm(`${c.owner} has already taken this request. Take it as well? Agree with them who goes.`)) return;
+    addEvents([{ t: 'claim', id: eventId('c'), at, caseId: c.id, ...who }]);
+  } else {
+    let note;
+    // A person decides; for a critical household, closing it needs a confirmation from the family or the boat team.
+    if ((what === 'rescued' || what === 'unreachable') && c.tier === 'critical') {
+      note = prompt(what === 'rescued'
+        ? `Close this critical request (${c.vulnerable.join(', ') || 'critical'})? Only if the family or the boat team confirmed it. How was it confirmed?`
+        : 'Mark this critical request "could not reach"? It will leave the list. What did you try?', what === 'rescued' ? 'Family confirmed on a call' : 'Called 3 times, no answer');
+      if (note == null || !note.trim()) return;
+    }
     const evs = [];
-    if (c.status === 'new' && what !== 'open') evs.push({ t: 'claim', id: eventId('c'), at, caseId: c.id, by: me.name });
-    evs.push({ t: 'status', id: eventId('s'), at, caseId: c.id, status: what, by: me.name });
+    if (c.status === 'new' && what !== 'open') evs.push({ t: 'claim', id: eventId('c'), at, caseId: c.id, ...who });
+    evs.push({ t: 'status', id: eventId('s'), at, caseId: c.id, status: what, ...who, ...(note ? { note: note.trim().slice(0, 140) } : {}) });
     addEvents(evs);
   }
   toast(what === 'claim' ? 'This request is yours now. Other volunteers can see that.' : `Marked “${STATUS[what] || 'reopened'}”`);

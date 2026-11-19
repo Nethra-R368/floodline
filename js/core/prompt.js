@@ -78,7 +78,14 @@ export function guardAi(item, text, rules = extractRules(text), where = 'cloud')
   const small = where === 'device';
   const guard = [];
   const ai = item && typeof item === 'object' ? item : {};
-  const kind = KINDS.includes(ai.kind) ? ai.kind : rules.kind;
+  // Safety: the AI may never take a request off the list. If the rules read a request and the AI disagrees,
+  // it stays a request, marked for a person to check (aiKind), and the board sorts it below clear requests.
+  let kind = KINDS.includes(ai.kind) ? ai.kind : rules.kind;
+  let aiKind = null;
+  if (rules.kind === 'request' && kind !== 'request') {
+    aiKind = kind; kind = 'request';
+    guard.push(`Check: the AI thinks this is ${aiKind === 'offer' ? 'a helpline or an offer' : aiKind === 'update' ? 'an update (they may be safe)' : 'not a request'}; it stays on the list until a person decides`);
+  }
 
   const aiPhones = asArr(ai.phones).map((p) => String(p).replace(/\D/g, '').slice(-10)).filter((p) => p.length === 10);
   const okPhones = aiPhones.filter((p) => phoneInText(p, text));
@@ -118,6 +125,7 @@ export function guardAi(item, text, rules = extractRules(text), where = 'cloud')
 
   const x = {
     kind,
+    aiKind,
     phone: phones[0] || null,
     phones,
     areaId,
@@ -150,6 +158,6 @@ export function parseExtractReply(reply, texts, where = 'cloud') {
   }
   return texts.map((t, i) => {
     const item = items.find((it) => it && Number(it.i) === i) || items[i];
-    return item ? guardAi(item, t, extractRules(t), where) : { ...extractRules(t), guard: ['AI gave no answer for this message, used rules'] };
+    return item ? { ...guardAi(item, t, extractRules(t), where), raw: item } : { ...extractRules(t), guard: ['AI gave no answer for this message, used rules'] };
   });
 }

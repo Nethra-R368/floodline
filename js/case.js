@@ -3,6 +3,7 @@ import { REAL_STREAM } from './core/realstream.js';
 import { REAL_SET } from './core/realset.js';
 import { MEASURED_REAL, MISSES_REAL } from './core/measured.js';
 import { extractRules } from './core/extract.js';
+import { guardAi } from './core/prompt.js';
 import { buildState } from './core/store.js';
 import { scoreHardSet } from './core/hardset.js';
 import { scamCheck } from './core/security.js';
@@ -20,10 +21,11 @@ async function aiReads() {
   try { return (await import('./core/realstream_ai.js')).STREAM_AI; } catch { return null; }
 }
 
-export const withAi = (r, a) => ({ ...r, ...a, areaId: a.areaId || r.areaId, phones: a.phones && a.phones.length ? a.phones : r.phones, source: 'ai' });
+// The recorded answers are Gemini's raw output; FloodLine's current checks are applied here, exactly as in the live app.
+export const withAi = (text, raw) => ({ ...guardAi(raw, text, extractRules(text), 'cloud'), where: 'cloud' });
 
 function stateFor(xs) {
-  const evs = REAL_STREAM.map((m, i) => ({ t: 'report', id: `R${i}`, at: m.at, text: m.text, source: 'X, 2 Dec 2015', x: xs ? withAi(extractRules(m.text), xs[i]) : extractRules(m.text) }));
+  const evs = REAL_STREAM.map((m, i) => ({ t: 'report', id: `R${i}`, at: m.at, text: m.text, source: 'X, 2 Dec 2015', x: xs ? withAi(m.text, xs[i]) : extractRules(m.text) }));
   return { evs, st: buildState(evs, Math.ceil(REAL_STREAM[REAL_STREAM.length - 1].at) + 10) }; // same moment the board's replay ends
 }
 
