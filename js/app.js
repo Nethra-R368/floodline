@@ -37,7 +37,8 @@ const els = {
 };
 
 // ---------------- workspace (event log + replay state), persisted per browser ----------------
-let ws = ['live', 'r2015'].includes(store.get('floodline.workspace')) ? store.get('floodline.workspace') : 'demo';
+// First visit: open on the real 2015 flood replay.
+let ws = ['live', 'r2015', 'demo'].includes(store.get('floodline.workspace')) ? store.get('floodline.workspace') : 'r2015';
 let W = loadWorkspace(ws);
 let state = null;
 let filter = 'action';
@@ -470,6 +471,7 @@ const DEVICE_TEXT = {
   unsupported: 'Not available in this browser. Use desktop Chrome 139+ and turn on chrome://flags/#prompt-api-for-gemini-nano-multimodal-input.',
 };
 async function refreshAiStatus() {
+  els.aiCloudState.textContent = !isConfigured() ? 'Not set up on this copy of FloodLine.' : navigator.onLine ? 'Ready (Firebase AI Logic).' : 'Offline right now.';
   ai.device = await deviceStatus();
   els.aiDeviceState.textContent = DEVICE_TEXT[ai.device] || ai.device;
   els.aiCloudState.textContent = !isConfigured() ? 'Not set up on this copy of FloodLine.' : navigator.onLine ? 'Ready (Firebase AI Logic).' : 'Offline right now.';
@@ -637,6 +639,9 @@ function switchWorkspace(name) {
 }
 els.workspace.addEventListener('change', () => switchWorkspace(els.workspace.value));
 $('goLive').addEventListener('click', () => switchWorkspace('live'));
+$('goReal').addEventListener('click', () => switchWorkspace('r2015'));
+$('replayPlay').addEventListener('click', () => { if (!timer) { els.speed.value = '12'; setPlaying(true); } });
+$('replayStory').addEventListener('click', () => document.querySelector('.tab[data-view="case"]').click());
 setInterval(() => { if (ws === 'live') scheduleRender(); }, 30000);
 
 // tabs

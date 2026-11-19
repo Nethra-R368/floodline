@@ -42,7 +42,7 @@ function getModel(mode, cloudModel = CLOUD_MODELS[0]) {
         createOptions: LM_OPTIONS,
         promptOptions: { responseConstraint: EXTRACT_SCHEMA },
       },
-    }, { timeout: 90000 });
+    }, { timeout: 45000 });
   }
   return models[key];
 }
@@ -64,9 +64,18 @@ async function generate(mode, prompt) {
 }
 
 /** 'available' | 'downloadable' | 'downloading' | 'unavailable' | 'unsupported' (no built-in AI in this browser) */
+// Chrome can take a long time to answer availability() on machines without the model, so never wait on it
+// for more than 2.5 s (and remember the answer for a minute): a slow answer means "use the cloud".
+let statusCache = null;
 export async function deviceStatus() {
   if (!('LanguageModel' in self)) return 'unsupported';
-  try { return await self.LanguageModel.availability(LM_OPTIONS); } catch { return 'unsupported'; }
+  if (statusCache && Date.now() - statusCache.at < 60000) return statusCache.value;
+  const value = await Promise.race([
+    self.LanguageModel.availability(LM_OPTIONS).catch(() => 'unsupported'),
+    new Promise((r) => setTimeout(() => r('unavailable'), 2500)),
+  ]);
+  statusCache = { value, at: Date.now() };
+  return value;
 }
 
 /** Download Gemini Nano (needs a click first; can take a few minutes). */
@@ -84,6 +93,8 @@ export async function readMessages(texts, mode = 'auto', onProgress = () => {}) 
   if (!isConfigured()) throw new Error('AI is not set up yet; messages were read by rules.');
   await load();
   const onDevice = mode === 'device' || (mode === 'auto' && (await deviceStatus()) === 'available');
+  // "On this device first" with no model on this device: go straight to the cloud instead of letting the SDK probe again.
+  if (mode === 'auto' && !onDevice) mode = 'cloud';
   const size = onDevice ? BATCH.device : BATCH.cloud;
   const xs = [];
   const where = { device: 0, cloud: 0 };
