@@ -24,7 +24,7 @@ export const withAi = (r, a) => ({ ...r, ...a, areaId: a.areaId || r.areaId, pho
 
 function stateFor(xs) {
   const evs = REAL_STREAM.map((m, i) => ({ t: 'report', id: `R${i}`, at: m.at, text: m.text, source: 'X, 2 Dec 2015', x: xs ? withAi(extractRules(m.text), xs[i]) : extractRules(m.text) }));
-  return { evs, st: buildState(evs, REAL_STREAM[REAL_STREAM.length - 1].at + 1) };
+  return { evs, st: buildState(evs, Math.ceil(REAL_STREAM[REAL_STREAM.length - 1].at) + 10) }; // same moment the board's replay ends
 }
 
 function hourly(evs, st) {
