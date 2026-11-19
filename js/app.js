@@ -381,6 +381,8 @@ function renderDrawer() {
   const actBtn = (status, label, cls = 'btn') => `<button type="button" class="${cls}" data-act="${status}">${label}</button>`;
   const actions = [];
   if (c.status === 'new') actions.push(actBtn('claim', 'I’ll take this <span class="ta">நான் எடுத்துக்கொள்கிறேன்</span>', 'btn dark'));
+  // Someone else has it (they may have gone quiet): another volunteer can join, after a warning, and both are shown.
+  else if (!done && c.owner && c.owner !== me.name && !(c.claimers || []).includes(me.name)) actions.push(actBtn('claim', 'I’ll take this as well'));
   if (c.status === 'new' || c.status === 'claimed') actions.push(actBtn('enroute', 'Boat is on the way'));
   if (!done) actions.push(actBtn('rescued', 'Mark rescued', 'btn go'), actBtn('unreachable', 'Could not reach'));
   else actions.push(actBtn('open', 'Reopen'));
