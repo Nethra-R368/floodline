@@ -25,7 +25,7 @@ small { font-size: 16px; color: #666; }
 </style></head><body>
 
 <section class="s dark">
-  <div class="k">Innovate India 2026 · Open innovation · Nethra R</div>
+  <div class="k">Open innovation · AI for disaster management · Nethra R (solo)</div>
   <h1>FloodLine</h1>
   <h2 style="color:#fff;max-width:900px">A flood rescue board that keeps working in airplane mode</h2>
   <div class="quote">“#Pregnant lady in #labour pain, Mukambikai Nagar, Ramapuram”<br><small style="color:#aaa">a real post, 2 December 2015, 21:17 (number changed)</small></div>
@@ -117,8 +117,32 @@ small { font-size: 16px; color: #666; }
   <div class="foot"><span>FloodLine</span><span>6</span></div>
 </section>
 
+<section class="s">
+  <div class="k">6 · System architecture & workflow</div>
+  <h2>One message, from paste to a boat</h2>
+  <div style="display:flex;gap:14px;align-items:stretch;margin:10px 0 26px">
+    <div class="tile" style="flex:1"><b>1 · Paste</b><span>WhatsApp / X / SMS text, split into messages</span></div>
+    <div class="tile" style="flex:1"><b>2 · Rules</b><span>instant, offline: phone, area (54 localities, Tamil + English), people, water, vulnerable</span></div>
+    <div class="tile" style="flex:1;border-color:#b3261e"><b>3 · Gemini</b><span>Firebase AI Logic, PREFER_ON_DEVICE: Gemini Nano on the laptop, else Gemini in the cloud; one JSON schema</span></div>
+    <div class="tile" style="flex:1"><b>4 · Checks</b><span>every detail must be in the message; AI can't remove a request</span></div>
+    <div class="tile" style="flex:1"><b>5 · Group + rank</b><span>repeats merged; points for urgency; critical first</span></div>
+    <div class="tile" style="flex:1"><b>6 · Act</b><span>take, call, confirm address, mark rescued (with confirmation)</span></div>
+  </div>
+  <div class="two" style="grid-template-columns:1.1fr .9fr">
+    <ul>
+      <li><b>Event log:</b> every message and action is an immutable event; the board is rebuilt from events, so devices merge them safely.</li>
+      <li><b>Sync:</b> events encrypted on the device (AES-256-GCM, key from the group code) → Firestore (append-only rules, App Check) → other volunteers decrypt.</li>
+      <li><b>Offline:</b> service worker keeps the app; Firestore queues writes until the network is back.</li>
+    </ul>
+    <ul>
+      <li><b>Future scope:</b> volunteer accounts & roles · encrypted storage on the phone · voice notes and photos (Gemini Nano multimodal) · Tamil evaluation · a drill with a rescue group.</li>
+    </ul>
+  </div>
+  <div class="foot"><span>FloodLine</span><span>7</span></div>
+</section>
+
 <section class="s dark">
-  <div class="k">6 · Impact & next steps</div>
+  <div class="k">7 · Impact & next steps</div>
   <h2 style="color:#fff">Who it helps: volunteer rescue groups and the families waiting for them</h2>
   <ul style="color:#ddd;max-width:1080px">
     <li>Simulation (a model, not a real flood): households never reached fall from <b>26.8 → 1.2</b> a night; wasted boat trips <b>26.7 → 0.4</b>.</li>
