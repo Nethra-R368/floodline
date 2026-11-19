@@ -544,7 +544,9 @@ $('fpChip').addEventListener('click', () => { els.settingsDialog.showModal(); $(
 
 // ---------------- shared board across phones (end-to-end encrypted) ----------------
 const shareSay = (msg, bad) => { const el = $('shareStatus'); el.textContent = msg; el.style.color = bad ? 'var(--red)' : 'var(--green)'; el.style.fontWeight = '600'; };
-async function startSharing(code) {
+let shareNote = '';
+async function startSharing(code, note = '') {
+  shareNote = note;
   if (ws !== 'live') switchWorkspace('live');
   shareSay('Connecting…');
   try {
@@ -556,7 +558,7 @@ async function startSharing(code) {
       scheduleRender();
     }, (st) => {
       if (st.state === 'error') shareSay(`Could not reach the shared board: ${st.error}`, true);
-      else shareSay(`🔐 Shared board ${st.code} · ${st.state === 'live' ? 'live' : 'offline — changes will be sent when the network is back'} · ${st.count ?? 0} encrypted events on the server${st.pending ? ' · sending…' : ''}`);
+      else shareSay(`🔐 Shared board ${st.code} · ${st.state === 'live' ? 'live' : 'offline — changes will be sent when the network is back'} · ${st.count ?? 0} encrypted events on the server${st.pending ? ' · sending…' : ''}${shareNote}`);
     });
     store.set('floodline.shareCode', c);
     $('shareCode').value = c;
@@ -571,8 +573,7 @@ $('shareJoin').addEventListener('click', () => startSharing($('shareCode').value
 $('shareRotate').addEventListener('click', async () => {
   if (!sharedCode()) return;
   if (!confirm('Move this board to a new group code? Everyone who should keep seeing it will need the new code.')) return;
-  await startSharing(newGroupCode());
-  shareSay(`Moved to a new code: ${sharedCode()}. Read it out to the volunteers who should stay; the old code gets no new updates.`);
+  await startSharing(newGroupCode(), '. Moved to this new code: read it out to the volunteers who should stay; the old code gets no new updates.');
 });
 $('forgetBoard').addEventListener('click', () => {
   if (!confirm('Delete the live board and the group code from this device? Other volunteers keep their copies.')) return;
