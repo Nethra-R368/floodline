@@ -51,7 +51,7 @@ const seenCases = new Set();
 let firstRender = true;
 const me = { name: store.get('floodline.me') || '' };
 const DEVICE = store.get('floodline.device') || (() => { const d = Array.from(crypto.getRandomValues(new Uint8Array(3)), (b) => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[b % 32]).join(''); store.set('floodline.device', d); return d; })();
-const ai = { mode: ['auto', 'device', 'cloud', 'off'].includes(store.get('floodline.aiMode')) ? store.get('floodline.aiMode') : 'auto', device: 'unsupported' };
+const ai = { mode: ['auto', 'device', 'cloud', 'off'].includes(store.get('floodline.aiMode')) ? store.get('floodline.aiMode') : 'auto', device: 'checking' };
 
 function loadWorkspace(name) {
   try {
@@ -477,6 +477,7 @@ els.nameDialog.addEventListener('close', () => {
 function aiStateText() {
   if (ai.mode === 'off') return 'Messages are read by rules only (AI switched off in Settings).';
   if (!isConfigured()) return 'Messages are read by rules, offline. AI reading is not set up on this copy.';
+  if (ai.device === 'checking' && ai.mode !== 'cloud') return 'Checking for the on-device AI (Gemini Nano)…';
   if (ai.device === 'available' && ai.mode !== 'cloud') return deviceWarmth.state === 'warming'
     ? 'Gemini Nano is starting on this device (first start can take a minute; rules read messages meanwhile).'
     : 'Messages are read by rules, then by Gemini Nano on this device: works with no internet, nothing leaves this device.';
