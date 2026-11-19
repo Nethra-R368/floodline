@@ -85,6 +85,22 @@ export async function deviceStatus() {
   return value;
 }
 
+// The first start of Gemini Nano loads a few GB into memory and can take a minute on a laptop.
+// Start it in the background as soon as the page opens, and keep one session open so it stays loaded:
+// by the time a volunteer pastes the first message, on-device reading takes seconds, with or without internet.
+let warm = null;
+export const deviceWarmth = { state: 'cold', ms: 0 };
+export function warmDevice(onChange = () => {}) {
+  if (warm || !('LanguageModel' in self)) return warm;
+  const t0 = performance.now();
+  deviceWarmth.state = 'warming'; onChange(deviceWarmth);
+  warm = self.LanguageModel.create(LM_OPTIONS)
+    .then((s) => s.prompt('Reply with OK.').then(() => s))
+    .then((s) => { deviceWarmth.state = 'warm'; deviceWarmth.ms = Math.round(performance.now() - t0); onChange(deviceWarmth); return s; })
+    .catch(() => { deviceWarmth.state = 'cold'; warm = null; onChange(deviceWarmth); return null; });
+  return warm;
+}
+
 /** Download Gemini Nano (needs a click first; can take a few minutes). */
 export async function prepareDevice(onProgress = () => {}) {
   if (!isConfigured()) throw new Error('Firebase is not set up yet.');

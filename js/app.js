@@ -7,7 +7,7 @@ import { splitMessages } from './core/input.js';
 import { HARD_SET } from './core/hardset.js';
 import { REAL_STREAM } from './core/realstream.js';
 import { STREAM_AI } from './core/realstream_ai.js';
-import { isConfigured, deviceStatus, prepareDevice, readMessages } from './ai.js';
+import { isConfigured, deviceStatus, prepareDevice, readMessages, warmDevice, deviceWarmth } from './ai.js';
 import { createMap } from './map.js';
 import { initBench } from './bench.js';
 import { $, esc, store, toast, copyText } from './util.js';
@@ -477,7 +477,9 @@ els.nameDialog.addEventListener('close', () => {
 function aiStateText() {
   if (ai.mode === 'off') return 'Messages are read by rules only (AI switched off in Settings).';
   if (!isConfigured()) return 'Messages are read by rules, offline. AI reading is not set up on this copy.';
-  if (ai.device === 'available' && ai.mode !== 'cloud') return 'Messages are read by rules, then by Gemini Nano on this device: works with no internet, nothing leaves this device.';
+  if (ai.device === 'available' && ai.mode !== 'cloud') return deviceWarmth.state === 'warming'
+    ? 'Gemini Nano is starting on this device (first start can take a minute; rules read messages meanwhile).'
+    : 'Messages are read by rules, then by Gemini Nano on this device: works with no internet, nothing leaves this device.';
   if (ai.mode === 'device') return 'On-device AI is not ready on this browser yet (Settings), so messages are read by rules.';
   return navigator.onLine ? 'Messages are read by rules, then by Gemini in the cloud. Prepare the on-device model in Settings to read them with no internet.' : 'Offline: messages are read by rules. Prepare the on-device model in Settings to use AI with no internet.';
 }
@@ -493,6 +495,7 @@ async function refreshAiStatus() {
   els.aiCloudState.textContent = !isConfigured() ? 'Not set up on this copy of FloodLine.' : navigator.onLine ? 'Ready (Firebase AI Logic).' : 'Offline right now.';
   ai.device = await deviceStatus();
   els.aiDeviceState.textContent = DEVICE_TEXT[ai.device] || ai.device;
+  if (ai.device === 'available' && ai.mode !== 'cloud' && ai.mode !== 'off' && isConfigured()) warmDevice(() => scheduleRender());
   els.aiCloudState.textContent = !isConfigured() ? 'Not set up on this copy of FloodLine.' : navigator.onLine ? 'Ready (Firebase AI Logic).' : 'Offline right now.';
   els.prepareBtn.disabled = !isConfigured() || !(ai.device === 'downloadable' || ai.device === 'downloading');
   els.netState.classList.toggle('hidden', navigator.onLine);
