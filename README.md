@@ -13,6 +13,8 @@ Demo video: https://youtu.be/lbxbXQ5wG_Q
 | ![Board after replaying 520 real posts](docs/screenshots/board.jpg) | ![The Mudichur request, reported 12 times](docs/screenshots/request.jpg) |
 | **Real flood test** | **How well it understood** |
 | ![Real flood test page](docs/screenshots/case.jpg) | ![Accuracy on 60 labelled real posts](docs/screenshots/accuracy.jpg) |
+| **Airplane mode: Gemini Nano on the laptop** | **What the server stores (ciphertext only)** |
+| ![Offline, read by Gemini Nano](docs/screenshots/offline.jpg) | ![Firestore holds only ciphertext](docs/screenshots/server.jpg) |
 | **Security** | **Phone** |
 | ![Security page](docs/screenshots/security.jpg) | ![Phone layout](docs/screenshots/phone.jpg) |
 
